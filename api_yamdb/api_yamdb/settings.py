@@ -23,7 +23,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'api.apps.ApiConfig',
+    'django_filters',
+    'titles',
+    'api',
     'rest_framework',
     'djoser',
 ]
