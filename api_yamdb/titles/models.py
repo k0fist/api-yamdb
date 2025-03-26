@@ -77,7 +77,7 @@ class Review(models.Model):
 
 class Genre(models.Model):
     name = models.CharField(max_length=256, unique=True)
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField(max_length=256, unique=True)
 
 
 class Category(models.Model):
