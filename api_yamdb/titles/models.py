@@ -1,21 +1,31 @@
+from django.contrib.auth.models import AbstractUser
 from django.db import models
-#from django.contrib.auth.models import AbstractUser
-from django.contrib.auth import get_user_model
 from django.db.models import Avg
 from django.core.validators import MinValueValidator, MaxValueValidator
 
-User = get_user_model()
-#class User(AbstractUser):
-#    ROLE_CHOICES = [
-#       ('user', 'User'),
-#        ('moderator', 'Moderator'),
-#        ('admin', 'Admin'),
-#    ]
-#    bio = models.TextField(blank=True, null=True)
-#    role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='user')
-#
-#    def __str__(self):
-#        return self.username
+
+class User(AbstractUser):
+    """Переопределение страндартной модели пользователя."""
+
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('moderator', 'Moderator'),
+        ('admin', 'Admin'),
+        ('superuser', 'Superuser'),
+    ]
+    confirmation_code = models.TextField(
+        'Код подтверждения',
+        default=''
+    )
+    bio = models.TextField(blank=True, null=True)
+    role = models.CharField(
+        max_length=50,
+        choices=ROLE_CHOICES,
+        default='user'
+    )
+
+    def __str__(self):
+        return self.username
 
 
 class Title(models.Model):

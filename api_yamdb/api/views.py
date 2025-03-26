@@ -7,8 +7,10 @@ from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 import uuid
 from django.core.mail import send_mail
-
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from titles.models import Title, Category, Genre
+import re
 from .serializers import (
     TitleSerializer, CategorySerializer, GenreSerializer)
 # from .permissions import
@@ -22,18 +24,35 @@ class SignupView(APIView):
 
     def post(self, request):
         # import pdb; pdb.set_trace()
-        email = request.data.get('email')
-        username = request.data.get('username')
-        if username == 'me':
-            return Response(
-                {'error': 'Введите корректный username'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        if not email or not username:
-            return Response(
-                {'error': 'Email и username обязательны'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        email = request.data.get('email', '').strip()
+        username = request.data.get('username', '').strip()
+
+        errors = {}
+
+        # Валидация email
+        if not email:
+            errors['email'] = ['Это поле обязательно для заполнения.']
+        else:
+            try:
+                validate_email(email)
+            except ValidationError:
+                errors['email'] = ['Введите корректный email адрес.']
+            if len(email) > 254:
+                errors.setdefault('email', []).append('Email не должен превышать 254 символа.')
+
+        # Валидация username
+        if not username:
+            errors['username'] = ['Это поле обязательно для заполнения.']
+        elif username == 'me':
+            errors['username'] = ['Введите корректный username']
+        if len(username) > 150:
+            errors.setdefault('username', []).append('Username не должен превышать 150 символов.')
+        if re.fullmatch(r'^[\w.@+-]+\Z', username):
+            errors['username'] = ['Username имеет недопустимые символы']
+
+        # Если есть ошибки, возвращаем их в ответе
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
         user, created = User.objects.get_or_create(
             username=username,
             defaults={'email': email}
@@ -81,6 +100,7 @@ class TokenView(APIView):
             'access': str(refresh.access_token),
             'refresh': str(refresh)
         }, status=status.HTTP_200_OK)
+
 
 class TitleViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.all()
