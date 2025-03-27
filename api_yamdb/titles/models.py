@@ -24,6 +24,14 @@ class User(AbstractUser):
         default='user'
     )
 
+    def save(self, *args, **kwargs):
+        """Переопределение метода save для автоматической установки роли."""
+        if self.is_superuser:
+            self.role = 'superuser'
+        elif self.is_staff:
+            self.role = 'admin'
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.username
 
