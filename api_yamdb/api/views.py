@@ -15,10 +15,10 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from titles.models import Title, Category, Genre, Review, Comment
 import re
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import LimitOffsetPagination
 from .serializers import (
-    TitleSerializer, CategorySerializer, GenreSerializer, UserSerializer
+    TitleSerializer, CategorySerializer, GenreSerializer, UserSerializer, ReviewSerializer, CommentSerializer
 )
 from .permissions import AdminPermission
 from rest_framework.decorators import action
@@ -37,7 +37,7 @@ class UserView(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
     # pagination_class = LimitOffsetPagination
 
-    @action(detail=False, methods=['get', 'patch'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get', 'patch'], permission_classes=(IsAuthenticated,))
     def me(self, request, *args, **kwargs):
         user = request.user
         if request.method == 'GET':
@@ -162,12 +162,23 @@ class TokenView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class TitleViewSet(viewsets.ModelViewSet):
+class TitleViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet
+):
     queryset = Title.objects.all()
     serializer_class = TitleSerializer
-#    permission_classes = (,)
-    filter_backends = [DjangoFilterBackend,]
+    pagination_class = LimitOffsetPagination
+    filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_fields = ['category__slug', 'genre__slug', 'name', 'year']
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [AdminPermission()]
 
     def perform_create(self, serializer):
         """Создание нового произведения с проверкой года выпуска."""
@@ -189,18 +200,34 @@ class CategoryViewSet(
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     lookup_field = 'slug'
+    pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     search_fields = ('name',)
-    permission_classes = [permissions.IsAdminUser]
+
+    # Настройка разрешений
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [AdminPermission()]
 
 
-class GenreViewSet(viewsets.ModelViewSet):
+class GenreViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet
+):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
     lookup_field = 'slug'
-    filter_backends = (DjangoFilterBackend,)
-    search_fields = ('name')
-#    permission_classes = (,)
+    pagination_class = LimitOffsetPagination
+    filter_backends = (DjangoFilterBackend, SearchFilter)
+    search_fields = ('name', )
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [AdminPermission()]
 
 
 class ReviewViewSet(

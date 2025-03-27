@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 from django.contrib.auth import get_user_model
 from titles.models import Title, Category, Genre, Review, Comment
 
@@ -49,13 +50,27 @@ class TitleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Title
-        fields = '__all__'
+        fields = ('id', 'category', 'genre', 'name', 'year')
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    name = serializers.CharField(max_length=256, required=True)
+    slug = serializers.SlugField(
+        max_length=50, required=True,
+        validators=[UniqueValidator(queryset=Category.objects.all())]
+    )
+
     class Meta:
         model = Category
         fields = ('name', 'slug')
+
+    def validate_slug(self, value):
+        """Проверка, что username соответствует регулярному выражению."""
+        if value:
+            import re
+            if not re.match(r'^[-a-zA-Z0-9_]+$', value):
+                raise serializers.ValidationError("Invalid slug format.")
+        return value
 
 
 class GenreSerializer(serializers.ModelSerializer):
@@ -72,7 +87,7 @@ class GenreSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Genre
-        fields = ('id', 'name', 'slug')
+        fields = ('name', 'slug')
 
 
 class ReviewSerializer(serializers.ModelSerializer):
