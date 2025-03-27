@@ -1,6 +1,8 @@
 from rest_framework import viewsets, mixins, permissions, serializers, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from datetime import datetime
 from django.contrib.auth import get_user_model
@@ -129,15 +131,16 @@ class CategoryViewSet(
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     lookup_field = 'slug'
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, SearchFilter)
     search_fields = ('name',)
-#    permission_classes = (,)
+    permission_classes = [permissions.IsAdminUser]
 
 
 class GenreViewSet(viewsets.ModelViewSet):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
     lookup_field = 'slug'
-    filter_backends = (DjangoFilterBackend,)
-    search_fields = ('name')
-#    permission_classes = (,)
+    pagination_class = PageNumberPagination
+    filter_backends = (DjangoFilterBackend, SearchFilter)
+    search_fields = ('name',)
+    permission_classes = [permissions.IsAdminUser]
