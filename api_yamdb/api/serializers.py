@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from titles.models import Title, Category, Genre
+from titles.models import Title, Category, Genre, Review, Comment
 
 User = get_user_model()
 
@@ -59,6 +59,45 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class GenreSerializer(serializers.ModelSerializer):
+
+    def validate_slug(self, value):
+        """Проверяем, что slug соответствует правилам."""
+        if len(value) > 50:
+            raise serializers.ValidationError("Slug не должен превышать 50 символов.")
+        if not value.replace("-", "").replace("_", "").isalnum():
+            raise serializers.ValidationError(
+                "Slug может содержать только латинские буквы, цифры, дефис и нижнее подчеркивание."
+            )
+        return value
+
     class Meta:
         model = Genre
         fields = ('id', 'name', 'slug')
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    author = serializers.StringRelatedField(read_only=True)
+    pub_date = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%SZ", read_only=True)
+    class Meta:
+        model = Review
+        fields = ['id', 'title', 'author', 'text', 'score', 'pub_date']
+
+    def validate(self, data):
+        """Проверка на уникальность отзыва для произведения и пользователя"""
+        if Review.objects.filter(title=data['title'], author=data['author']).exists():
+            raise serializers.ValidationError(
+                "Вы уже оставили отзыв для этого произведения."
+            )
+        return data
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.StringRelatedField()
+    pub_date = serializers.DateTimeField(
+        format="%Y-%m-%dT%H:%M:%SZ",
+        read_only=True
+    )
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'text', 'author', 'pub_date']
