@@ -9,10 +9,12 @@ import uuid
 from django.core.mail import send_mail
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
-from titles.models import Title, Category, Genre
+from django.shortcuts import get_object_or_404
+from titles.models import Title, Category, Genre, Review, Comment
 import re
 from .serializers import (
-    TitleSerializer, CategorySerializer, GenreSerializer)
+    TitleSerializer, CategorySerializer, GenreSerializer, CommentSerializer,
+    ReviewSerializer)
 # from .permissions import
 
 
@@ -141,3 +143,41 @@ class GenreViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     search_fields = ('name')
 #    permission_classes = (,)
+
+
+class ReviewViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet
+):
+    serializer_class = ReviewSerializer
+
+    def get_queryset(self):
+        title = get_object_or_404(Title, id=self.kwargs['title_id'])
+        return title.reviews.all()
+
+    def perform_create(self, serializer):
+        title = get_object_or_404(Title, id=self.kwargs['title_id'])
+        serializer.save(author=self.request.user, title=title)
+
+
+class CommentViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet
+):
+    serializer_class = CommentSerializer
+
+    def get_queryset(self):
+        review = get_object_or_404(Review, id=self.kwargs['review_id'])
+        return review.comments.all()
+
+    def perform_create(self, serializer):
+        review = get_object_or_404(Review, id=self.kwargs['review_id'])
+        serializer.save(author=self.request.user, review=review)

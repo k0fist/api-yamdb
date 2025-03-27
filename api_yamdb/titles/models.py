@@ -45,7 +45,11 @@ class Title(models.Model):
         """Обновляет среднюю оценку произведения."""
         average_score = self.reviews.aggregate(
             avg_score=Avg('score'))['avg_score']
-        self.rating = round(average_score, 1) if average_score is not None else None
+        self.rating = (
+            round(average_score, 1)
+            if average_score is not None
+            else None
+        )
         self.save()
 
 
@@ -83,3 +87,21 @@ class Genre(models.Model):
 class Category(models.Model):
     name = models.CharField(max_length=256, unique=True)
     slug = models.SlugField(unique=True)
+
+
+class Comment(models.Model):
+    review = models.ForeignKey(
+        'Review',
+        on_delete=models.CASCADE,
+        related_name='comments'
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='comments'
+    )
+    text = models.TextField()
+    pub_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-pub_date']
