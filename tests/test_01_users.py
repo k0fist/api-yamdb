@@ -150,6 +150,7 @@ class Test01UserAPI:
     def test_05_01_users_post_admin_bad_requests(self, admin_client, admin):
         empty_data = {}
         response = admin_client.post(self.USERS_URL, data=empty_data)
+
         assert response.status_code == HTTPStatus.BAD_REQUEST, (
             f'Если POST-запрос администратора к `{self.USERS_URL}` '
             'не содержит необходимых данных - должен вернуться ответ со '

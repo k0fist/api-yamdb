@@ -1,4 +1,4 @@
-from rest_framework import viewsets, mixins, permissions, serializers, status
+from rest_framework import viewsets, mixins, permissions, serializers, status, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
@@ -11,12 +11,43 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from titles.models import Title, Category, Genre
 import re
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import LimitOffsetPagination
 from .serializers import (
-    TitleSerializer, CategorySerializer, GenreSerializer)
-# from .permissions import
-
+    TitleSerializer, CategorySerializer, GenreSerializer, UserSerializer
+)
+from .permissions import AdminPermission
+from rest_framework.decorators import action
 
 User = get_user_model()
+
+
+class UserView(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = (AdminPermission,)
+    pagination_class = LimitOffsetPagination
+    filter_backends = (filters.SearchFilter,)
+    search_fields = ('username',)
+    lookup_field = 'username'
+    http_method_names = ['get', 'post', 'patch', 'delete']
+    # pagination_class = LimitOffsetPagination
+
+    @action(detail=False, methods=['get', 'patch'], permission_classes=[IsAuthenticated])
+    def me(self, request, *args, **kwargs):
+        user = request.user
+        if request.method == 'GET':
+            serializer = UserSerializer(user)
+            return Response(serializer.data)
+        elif request.method == 'PATCH':
+            data = request.data.copy()
+            data.pop('role', None)
+            serializer = UserSerializer(user, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class SignupView(APIView):
@@ -28,6 +59,14 @@ class SignupView(APIView):
         username = request.data.get('username', '').strip()
 
         errors = {}
+
+        if User.objects.filter(email=email).exists():
+            if not User.objects.filter(username=username).exists():
+                errors['email'] = ['Этот email уже занят.']
+
+        elif User.objects.filter(username=username).exists():
+            if not User.objects.filter(email=email).exists():
+                errors['username'] = ['Этот username уже занят.']
 
         # Валидация email
         if not email:
@@ -45,9 +84,9 @@ class SignupView(APIView):
             errors['username'] = ['Это поле обязательно для заполнения.']
         elif username == 'me':
             errors['username'] = ['Введите корректный username']
-        if len(username) > 150:
+        elif len(username) > 150:
             errors.setdefault('username', []).append('Username не должен превышать 150 символов.')
-        if re.fullmatch(r'^[\w.@+-]+\Z', username):
+        elif not re.fullmatch(r'^[\w.@+-]+\Z', username):
             errors['username'] = ['Username имеет недопустимые символы']
 
         # Если есть ошибки, возвращаем их в ответе
@@ -68,8 +107,10 @@ class SignupView(APIView):
             recipient_list=[email]
         )
         return Response(
-            {'message': 'Проверьте свою почту для получения '
-             'кода подтверждения'},
+            {
+                'email': f'{email}',
+                'username': f'{username}',
+            },
             status=status.HTTP_200_OK
         )
 
@@ -78,21 +119,36 @@ class TokenView(APIView):
     """Формирование токена при корретный данных."""
 
     def post(self, request):
-        #import pdb; pdb.set_trace()
         username = request.data.get('username')
         confirmation_code = request.data.get('confirmation_code')
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            return Response(
-                {'error': 'Неверные данные'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        if user.confirmation_code != confirmation_code:
-            return Response(
-                {'error': 'Неверный код подтверждения'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+
+        errors = {}
+
+        if not username:
+            errors['username'] = ['Это поле обязательно для заполнения.']
+        elif username == 'me':
+            errors['username'] = ['Введите корректный username']
+        elif len(username) > 150:
+            errors.setdefault('username', []).append('Username не должен превышать 150 символов.')
+        elif not re.fullmatch(r'^[\w.@+-]+\Z', username):
+            errors['username'] = ['Username имеет недопустимые символы.']
+        else:
+            try:
+                user = User.objects.get(username=username)
+                if not confirmation_code:
+                    errors['confirmation_code'] = ['Это поле обязательно для заполнения.']
+                if user.confirmation_code != confirmation_code:
+                    errors['confirmation_code'] = ['Не верный код.']
+            except User.DoesNotExist:
+                return Response(
+                    {
+                        'username': 'Пользователь не найден'
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
         refresh = RefreshToken.for_user(user)
         user.confirmation_code = ""
         user.save()
