@@ -46,7 +46,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ('id', 'name', 'slug')
+        fields = ('name', 'slug')
 
     def validate_slug(self, value):
         """Проверка, что username соответствует регулярному выражению."""
@@ -106,7 +106,14 @@ class TitleSerializer(serializers.ModelSerializer):
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    author = serializers.StringRelatedField(read_only=True)
+    author = serializers.SlugRelatedField(
+        read_only=True,
+        slug_field='username'
+    )
+    title = serializers.SlugRelatedField(
+        queryset=Title.objects.all(),
+        slug_field='slug'
+    )
     pub_date = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%SZ", read_only=True)
 
     class Meta:
@@ -114,8 +121,12 @@ class ReviewSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'author', 'text', 'score', 'pub_date']
 
     def validate(self, data):
-        """Проверка на уникальность отзыва для произведения и пользователя"""
-        if Review.objects.filter(title=data['title'], author=data['author']).exists():
+        """
+        Проверка на уникальность отзыва для произведения и пользователя.
+        """
+        request = self.context['request']
+        title = data.get('title')
+        if Review.objects.filter(title=title, author=request.user).exists():
             raise serializers.ValidationError(
                 "Вы уже оставили отзыв для этого произведения."
             )

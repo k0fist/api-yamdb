@@ -220,18 +220,19 @@ class CategoryViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet
 ):
-    queryset = Category.objects.all()
+    queryset = Category.objects.all().order_by('name')
     serializer_class = CategorySerializer
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     search_fields = ('name',)
+    lookup_field = 'slug'
 
     # Настройка разрешений
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [AllowAny()]
         return [AdminPermission()]
-    
+
     def __str__(self):
         return self.name
 
@@ -247,6 +248,7 @@ class GenreViewSet(
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     search_fields = ('name', )
+    lookup_field = 'slug'
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -266,11 +268,11 @@ class ReviewViewSet(
 
     def get_permissions(self):
         """Определяет разрешения в зависимости от действия."""
-        if self.action in ['create', 'list', 'retrieve']:
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        elif self.action == 'create':
             return [IsAuthenticated()]
-        elif self.action in ['update', 'partial_update', 'destroy']:
-            return [IsAuthorOrAdmin()]
-        return [IsAuthenticated()]
+        return [IsAuthorOrAdmin()]
 
     def get_queryset(self):
         title = get_object_or_404(Title, id=self.kwargs['title_id'])
