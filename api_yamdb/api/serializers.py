@@ -37,22 +37,6 @@ class UserSerializer(serializers.ModelSerializer):
         return value
 
 
-class TitleSerializer(serializers.ModelSerializer):
-    category = serializers.SlugRelatedField(
-        queryset=Category.objects.all(),
-        slug_field='slug'
-    )
-    genre = serializers.SlugRelatedField(
-        queryset=Genre.objects.all(),
-        slug_field='slug',
-        many=True
-    )
-
-    class Meta:
-        model = Title
-        fields = ('id', 'category', 'genre', 'name', 'year')
-
-
 class CategorySerializer(serializers.ModelSerializer):
     name = serializers.CharField(max_length=256, required=True)
     slug = serializers.SlugField(
@@ -62,7 +46,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ('name', 'slug')
+        fields = ('id', 'name', 'slug')
 
     def validate_slug(self, value):
         """Проверка, что username соответствует регулярному выражению."""
@@ -75,6 +59,10 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class GenreSerializer(serializers.ModelSerializer):
 
+    class Meta:
+        model = Genre
+        fields = ('name', 'slug')
+
     def validate_slug(self, value):
         """Проверяем, что slug соответствует правилам."""
         if len(value) > 50:
@@ -85,14 +73,42 @@ class GenreSerializer(serializers.ModelSerializer):
             )
         return value
 
+
+class TitleSerializer(serializers.ModelSerializer):
+    category = serializers.SlugRelatedField(
+        queryset=Category.objects.all(), slug_field='slug', write_only=True
+    )
+    genre = serializers.SlugRelatedField(
+        queryset=Genre.objects.all(), slug_field='slug', many=True, write_only=True
+    )
+
     class Meta:
-        model = Genre
-        fields = ('name', 'slug')
+        model = Title
+        fields = ('id', 'name', 'year', 'category', 'genre', 'description')
+
+    def to_representation(self, instance):
+        """Изменяем вывод данных для соответствия ожидаемому формату."""
+        representation = super().to_representation(instance)
+
+        representation['category'] = {
+            "name": instance.category.name,
+            "slug": instance.category.slug
+        }
+        representation['genre'] = [
+            {"name": genre.name, "slug": genre.slug} for genre in instance.genre.all()
+        ]
+        return representation
+
+    def validate_name(self, value):
+        if len(value) > 256:
+            raise serializers.ValidationError("Название произведения не может быть длиннее 256 символов.")
+        return value
 
 
 class ReviewSerializer(serializers.ModelSerializer):
     author = serializers.StringRelatedField(read_only=True)
     pub_date = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%SZ", read_only=True)
+
     class Meta:
         model = Review
         fields = ['id', 'title', 'author', 'text', 'score', 'pub_date']

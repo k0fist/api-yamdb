@@ -1,5 +1,5 @@
 
-from rest_framework import viewsets, mixins, permissions, serializers, status, filters
+from rest_framework import viewsets, mixins, serializers, status, filters
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,15 +13,16 @@ from django.core.mail import send_mail
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
-from titles.models import Title, Category, Genre, Review, Comment
+from titles.models import Title, Category, Genre, Review
 import re
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import LimitOffsetPagination
 from .serializers import (
     TitleSerializer, CategorySerializer, GenreSerializer, UserSerializer, ReviewSerializer, CommentSerializer
 )
-from .permissions import AdminPermission
+from .permissions import AdminPermission, IsAuthorOrAdmin
 from rest_framework.decorators import action
+from .filters import TitleFilter
 
 User = get_user_model()
 
@@ -35,7 +36,6 @@ class UserView(viewsets.ModelViewSet):
     search_fields = ('username',)
     lookup_field = 'username'
     http_method_names = ['get', 'post', 'patch', 'delete']
-    # pagination_class = LimitOffsetPagination
 
     @action(detail=False, methods=['get', 'patch'], permission_classes=(IsAuthenticated,))
     def me(self, request, *args, **kwargs):
@@ -51,7 +51,6 @@ class UserView(viewsets.ModelViewSet):
                 serializer.save()
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 class SignupView(APIView):
@@ -166,19 +165,43 @@ class TitleViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
     mixins.DestroyModelMixin,
+    mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet
 ):
-    queryset = Title.objects.all()
+    queryset = Title.objects.select_related('category').prefetch_related('genre').all()
     serializer_class = TitleSerializer
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
-    filterset_fields = ['category__slug', 'genre__slug', 'name', 'year']
+    filterset_class = TitleFilter
+    search_fields = ['name']
+    permission_classes = [AllowAny]
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [AllowAny()]
         return [AdminPermission()]
+
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {"detail": "Метод PUT не поддерживается."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        """Обработка PATCH-запроса с валидацией длины поля `name`."""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            name = request.data.get('name', '')
+            if len(name) > 256:
+                return Response(
+                    {"detail": "Название произведения не может быть длиннее 256 символов."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
         """Создание нового произведения с проверкой года выпуска."""
@@ -199,7 +222,6 @@ class CategoryViewSet(
 ):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    lookup_field = 'slug'
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     search_fields = ('name',)
@@ -209,6 +231,9 @@ class CategoryViewSet(
         if self.action in ['list', 'retrieve']:
             return [AllowAny()]
         return [AdminPermission()]
+    
+    def __str__(self):
+        return self.name
 
 
 class GenreViewSet(
@@ -219,7 +244,6 @@ class GenreViewSet(
 ):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
-    lookup_field = 'slug'
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     search_fields = ('name', )
@@ -239,6 +263,14 @@ class ReviewViewSet(
     viewsets.GenericViewSet
 ):
     serializer_class = ReviewSerializer
+
+    def get_permissions(self):
+        """Определяет разрешения в зависимости от действия."""
+        if self.action in ['create', 'list', 'retrieve']:
+            return [IsAuthenticated()]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthorOrAdmin()]
+        return [IsAuthenticated()]
 
     def get_queryset(self):
         title = get_object_or_404(Title, id=self.kwargs['title_id'])
