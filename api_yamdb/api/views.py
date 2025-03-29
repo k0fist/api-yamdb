@@ -21,7 +21,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from .serializers import (
     TitleSerializer, CategorySerializer, GenreSerializer, UserSerializer, ReviewSerializer, CommentSerializer
 )
-from .permissions import AdminPermission, IsAuthorOrAdmin
+from .permissions import AdminPermission, IsAuthorOrAdminOrModerator
 from rest_framework.decorators import action
 from .filters import TitleFilter
 
@@ -162,14 +162,7 @@ class TokenView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class TitleViewSet(
-    mixins.ListModelMixin,
-    mixins.CreateModelMixin,
-    mixins.DestroyModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin,
-    viewsets.GenericViewSet
-):
+class TitleViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.select_related('category').prefetch_related('genre').all()
     serializer_class = TitleSerializer
     pagination_class = LimitOffsetPagination
@@ -257,14 +250,7 @@ class GenreViewSet(
         return [AdminPermission()]
 
 
-class ReviewViewSet(
-    mixins.ListModelMixin,
-    mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin,
-    mixins.DestroyModelMixin,
-    viewsets.GenericViewSet
-):
+class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
 
     def get_permissions(self):
@@ -274,7 +260,7 @@ class ReviewViewSet(
         elif self.action == 'create':
             return [IsAuthenticated()]
         elif self.action in ['update', 'partial_update', 'destroy']:
-            return [IsAuthorOrAdmin()]
+            return [IsAuthorOrAdminOrModerator()]
         return []
 
     def update(self, request, *args, **kwargs):
@@ -318,20 +304,53 @@ class ReviewViewSet(
         serializer.save(author=self.request.user, title=title)
 
 
-class CommentViewSet(
-    mixins.ListModelMixin,
-    mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin,
-    mixins.DestroyModelMixin,
-    viewsets.GenericViewSet
-):
+class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
 
+    def get_permissions(self):
+        """Определяет разрешения в зависимости от действия."""
+        if self.action == 'list' or self.action == 'retrieve':
+            return [AllowAny()]  # Получение списка и отдельного комментария без авторизации
+        elif self.action == 'create':
+            return [IsAuthenticated()]  # Только аутентифицированные пользователи могут создавать комментарии
+        elif self.action in ['partial_update', 'destroy']:
+            return [IsAuthorOrAdminOrModerator()]  # Только автор комментария, модератор или администратор
+        return []
+
     def get_queryset(self):
+        """Получить все комментарии к отзыву."""
         review = get_object_or_404(Review, id=self.kwargs['review_id'])
         return review.comments.all()
 
     def perform_create(self, serializer):
+        """Добавить новый комментарий к отзыву."""
         review = get_object_or_404(Review, id=self.kwargs['review_id'])
         serializer.save(author=self.request.user, review=review)
+
+    def post(self, request, *args, **kwargs):
+        """Обработка POST-запросов для детализированного эндпоинта (не поддерживается)."""
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        return Response(
+            {"detail": "Метод POST не поддерживается для этого эндпоинта."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        """Частичное обновление комментария."""
+        return super().partial_update(request, *args, **kwargs)
+    
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {"detail": "Метод PUT не поддерживается для комментариев."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    
+
+    # def destroy(self, request, *args, **kwargs):
+    #     """Удаление комментария."""
+    #     return super().destroy(request, *args, **kwargs)
