@@ -18,3 +18,4 @@ class IsAuthorOrAdminOrModerator(permissions.IsAuthenticated):
         return (obj.author == request.user
                 or (request.user.role == 'admin' or request.user.is_staff)
                 or request.user.role == 'moderator')
+

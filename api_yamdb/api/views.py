@@ -16,7 +16,7 @@ from django.shortcuts import get_object_or_404
 from titles.models import Title, Category, Genre
 from reviews.models import Review
 import re
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
 from rest_framework.pagination import LimitOffsetPagination
 from .serializers import (
     TitleSerializer, CategorySerializer, GenreSerializer, UserSerializer, ReviewSerializer, CommentSerializer
@@ -309,12 +309,12 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         """Определяет разрешения в зависимости от действия."""
-        if self.action == 'list' or self.action == 'retrieve':
-            return [AllowAny()]  # Получение списка и отдельного комментария без авторизации
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
         elif self.action == 'create':
-            return [IsAuthenticated()]  # Только аутентифицированные пользователи могут создавать комментарии
-        elif self.action in ['partial_update', 'destroy']:
-            return [IsAuthorOrAdminOrModerator()]  # Только автор комментария, модератор или администратор
+            return [IsAuthenticated()]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthorOrAdminOrModerator()]
         return []
 
     def get_queryset(self):
@@ -339,17 +339,22 @@ class CommentViewSet(viewsets.ModelViewSet):
             status=status.HTTP_405_METHOD_NOT_ALLOWED
         )
 
-    def partial_update(self, request, *args, **kwargs):
-        """Частичное обновление комментария."""
-        return super().partial_update(request, *args, **kwargs)
-    
     def update(self, request, *args, **kwargs):
         return Response(
-            {"detail": "Метод PUT не поддерживается для комментариев."},
+            {"detail": "Метод PUT не поддерживается."},
             status=status.HTTP_405_METHOD_NOT_ALLOWED
         )
 
+    def partial_update(self, request, *args, **kwargs):
+        """Обработка PATCH-запроса."""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
     
+
+
 
     # def destroy(self, request, *args, **kwargs):
     #     """Удаление комментария."""

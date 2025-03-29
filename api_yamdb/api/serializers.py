@@ -67,7 +67,9 @@ class GenreSerializer(serializers.ModelSerializer):
     def validate_slug(self, value):
         """Проверяем, что slug соответствует правилам."""
         if len(value) > 50:
-            raise serializers.ValidationError("Slug не должен превышать 50 символов.")
+            raise serializers.ValidationError(
+                "Slug не должен превышать 50 символов."
+            )
         if not value.replace("-", "").replace("_", "").isalnum():
             raise serializers.ValidationError(
                 "Slug может содержать только латинские буквы, цифры, дефис и нижнее подчеркивание."
