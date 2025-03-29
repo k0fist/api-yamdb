@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import get_user_model
-from titles.models import Title, Category, Genre, Review, Comment
+from titles.models import Title, Category, Genre
+from reviews.models import Review, Comment
 
 User = get_user_model()
 
@@ -84,7 +85,7 @@ class TitleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Title
-        fields = ('id', 'name', 'year', 'category', 'genre', 'description')
+        fields = ('id', 'name', 'year', 'category', 'genre', 'description', 'rating')
 
     def to_representation(self, instance):
         """Изменяем вывод данных для соответствия ожидаемому формату."""
@@ -110,10 +111,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         read_only=True,
         slug_field='username'
     )
-    title = serializers.SlugRelatedField(
-        queryset=Title.objects.all(),
-        slug_field='slug'
-    )
+    title = serializers.PrimaryKeyRelatedField(read_only=True)
     pub_date = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%SZ", read_only=True)
 
     class Meta:
@@ -121,15 +119,12 @@ class ReviewSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'author', 'text', 'score', 'pub_date']
 
     def validate(self, data):
-        """
-        Проверка на уникальность отзыва для произведения и пользователя.
-        """
-        request = self.context['request']
-        title = data.get('title')
-        if Review.objects.filter(title=title, author=request.user).exists():
-            raise serializers.ValidationError(
-                "Вы уже оставили отзыв для этого произведения."
-            )
+        request = self.context.get('request')
+        if request and request.method == 'POST':
+            user = request.user
+            title_id = self.context['view'].kwargs.get('title_id')
+            if Review.objects.filter(title_id=title_id, author=user).exists():
+                raise serializers.ValidationError('Вы уже оставили отзыв к этому заголовку.')
         return data
 
 

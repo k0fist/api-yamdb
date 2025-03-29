@@ -13,7 +13,8 @@ from django.core.mail import send_mail
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
-from titles.models import Title, Category, Genre, Review
+from titles.models import Title, Category, Genre
+from reviews.models import Review
 import re
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import LimitOffsetPagination
@@ -272,11 +273,45 @@ class ReviewViewSet(
             return [AllowAny()]
         elif self.action == 'create':
             return [IsAuthenticated()]
-        return [IsAuthorOrAdmin()]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthorOrAdmin()]
+        return []
+
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {"detail": "Метод PUT не поддерживается."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        """Обработка PATCH-запроса с дополнительной валидацией."""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            score = request.data.get('score')
+            try:
+                score = float(score)
+            except (ValueError, TypeError):
+                return Response(
+                    {"detail": "Оценка должна быть числом."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if score < 1 or score > 10:
+                return Response(
+                    {"detail": "Оценка должна быть от 1 до 10."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def get_queryset(self):
         title = get_object_or_404(Title, id=self.kwargs['title_id'])
-        return title.reviews.all()
+        return title.reviews.all().order_by('-pub_date')
 
     def perform_create(self, serializer):
         title = get_object_or_404(Title, id=self.kwargs['title_id'])
