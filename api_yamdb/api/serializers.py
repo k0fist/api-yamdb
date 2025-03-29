@@ -1,8 +1,10 @@
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import get_user_model
+
 from titles.models import Title, Category, Genre
 from reviews.models import Review, Comment
+
 
 User = get_user_model()
 
@@ -34,7 +36,8 @@ class UserSerializer(serializers.ModelSerializer):
         if value:
             import re
             if not re.match(r'^[\w.@+-]+\Z', value):
-                raise serializers.ValidationError("Invalid username format.")
+                raise serializers.ValidationError('Такие символы '
+                                                  'запрещены в username.')
         return value
 
 
@@ -54,7 +57,8 @@ class CategorySerializer(serializers.ModelSerializer):
         if value:
             import re
             if not re.match(r'^[-a-zA-Z0-9_]+$', value):
-                raise serializers.ValidationError("Invalid slug format.")
+                raise serializers.ValidationError('Такие символы '
+                                                  'запрещены в slug.')
         return value
 
 
@@ -68,11 +72,12 @@ class GenreSerializer(serializers.ModelSerializer):
         """Проверяем, что slug соответствует правилам."""
         if len(value) > 50:
             raise serializers.ValidationError(
-                "Slug не должен превышать 50 символов."
+                'Slug не должен превышать 50 символов.'
             )
-        if not value.replace("-", "").replace("_", "").isalnum():
+        if not value.replace('-', '').replace('_', '').isalnum():
             raise serializers.ValidationError(
-                "Slug может содержать только латинские буквы, цифры, дефис и нижнее подчеркивание."
+                'Slug может содержать только латинские буквы,'
+                'цифры, дефис и нижнее подчеркивание.'
             )
         return value
 
@@ -82,29 +87,34 @@ class TitleSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all(), slug_field='slug', write_only=True
     )
     genre = serializers.SlugRelatedField(
-        queryset=Genre.objects.all(), slug_field='slug', many=True, write_only=True
+        queryset=Genre.objects.all(),
+        slug_field='slug', many=True, write_only=True
     )
 
     class Meta:
         model = Title
-        fields = ('id', 'name', 'year', 'category', 'genre', 'description', 'rating')
+        fields = ('id', 'name', 'year',
+                  'category', 'genre', 'description', 'rating'
+                  )
 
     def to_representation(self, instance):
         """Изменяем вывод данных для соответствия ожидаемому формату."""
         representation = super().to_representation(instance)
 
         representation['category'] = {
-            "name": instance.category.name,
-            "slug": instance.category.slug
+            'name': instance.category.name,
+            'slug': instance.category.slug
         }
         representation['genre'] = [
-            {"name": genre.name, "slug": genre.slug} for genre in instance.genre.all()
+            {'name': genre.name, 'slug': genre.slug}
+            for genre in instance.genre.all()
         ]
         return representation
 
     def validate_name(self, value):
         if len(value) > 256:
-            raise serializers.ValidationError("Название произведения не может быть длиннее 256 символов.")
+            raise serializers.ValidationError('Название произведения не может '
+                                              'быть длиннее 256 символов.')
         return value
 
 
@@ -114,7 +124,10 @@ class ReviewSerializer(serializers.ModelSerializer):
         slug_field='username'
     )
     title = serializers.PrimaryKeyRelatedField(read_only=True)
-    pub_date = serializers.DateTimeField(format="%Y-%m-%dT%H:%M:%SZ", read_only=True)
+    pub_date = serializers.DateTimeField(
+        format='%Y-%m-%dT%H:%M:%SZ',
+        read_only=True
+    )
 
     class Meta:
         model = Review
@@ -126,14 +139,15 @@ class ReviewSerializer(serializers.ModelSerializer):
             user = request.user
             title_id = self.context['view'].kwargs.get('title_id')
             if Review.objects.filter(title_id=title_id, author=user).exists():
-                raise serializers.ValidationError('Вы уже оставили отзыв к этому заголовку.')
+                raise serializers.ValidationError('Вы уже оставили отзыв'
+                                                  ' к этому заголовку.')
         return data
 
 
 class CommentSerializer(serializers.ModelSerializer):
     author = serializers.StringRelatedField()
     pub_date = serializers.DateTimeField(
-        format="%Y-%m-%dT%H:%M:%SZ",
+        format='%Y-%m-%dT%H:%M:%SZ',
         read_only=True
     )
 

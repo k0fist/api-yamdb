@@ -62,7 +62,7 @@ class Title(models.Model):
     genre = models.ManyToManyField('Genre', related_name='titles')
     year = models.PositiveIntegerField()
     description = models.TextField(blank=True, null=True)
-    rating = models.FloatField(null=True, blank=True)  # Средний рейтинг
+    rating = models.FloatField(null=True, blank=True)
 
     def update_rating(self):
         """Обновляет среднюю оценку произведения."""

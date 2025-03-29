@@ -1,31 +1,35 @@
 
 from rest_framework import viewsets, mixins, serializers, status, filters
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.filters import SearchFilter
-from django_filters.rest_framework import DjangoFilterBackend
-from datetime import datetime
-from django.contrib.auth import get_user_model
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework_simplejwt.tokens import RefreshToken
-import uuid
+from rest_framework.decorators import action
+
+from datetime import datetime
+from django_filters.rest_framework import DjangoFilterBackend
+from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+import uuid
+import re
+
 from titles.models import Title, Category, Genre
 from reviews.models import Review
-import re
-from rest_framework.permissions import IsAuthenticated, AllowAny, IsAuthenticatedOrReadOnly
-from rest_framework.pagination import LimitOffsetPagination
 from .serializers import (
-    TitleSerializer, CategorySerializer, GenreSerializer, UserSerializer, ReviewSerializer, CommentSerializer
+    TitleSerializer, CategorySerializer, GenreSerializer,
+    UserSerializer, ReviewSerializer, CommentSerializer
 )
 from .permissions import AdminPermission, IsAuthorOrAdminOrModerator
-from rest_framework.decorators import action
 from .filters import TitleFilter
 
 User = get_user_model()
+
+REQUIRED_FIELD_PHRASE = 'Это поле обязательно для заполнения.'
 
 
 class UserView(viewsets.ModelViewSet):
@@ -38,7 +42,11 @@ class UserView(viewsets.ModelViewSet):
     lookup_field = 'username'
     http_method_names = ['get', 'post', 'patch', 'delete']
 
-    @action(detail=False, methods=['get', 'patch'], permission_classes=(IsAuthenticated,))
+    @action(
+            detail=False,
+            methods=['get', 'patch'],
+            permission_classes=(IsAuthenticated,)
+    )
     def me(self, request, *args, **kwargs):
         user = request.user
         if request.method == 'GET':
@@ -51,49 +59,46 @@ class UserView(viewsets.ModelViewSet):
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class SignupView(APIView):
     """Регистрация нового пользовователя."""
 
     def post(self, request):
-        # import pdb; pdb.set_trace()
         email = request.data.get('email', '').strip()
         username = request.data.get('username', '').strip()
-
         errors = {}
-
         if User.objects.filter(email=email).exists():
             if not User.objects.filter(username=username).exists():
                 errors['email'] = ['Этот email уже занят.']
-
         elif User.objects.filter(username=username).exists():
             if not User.objects.filter(email=email).exists():
                 errors['username'] = ['Этот username уже занят.']
-
-        # Валидация email
         if not email:
-            errors['email'] = ['Это поле обязательно для заполнения.']
+            errors['email'] = [REQUIRED_FIELD_PHRASE]
         else:
             try:
                 validate_email(email)
             except ValidationError:
                 errors['email'] = ['Введите корректный email адрес.']
             if len(email) > 254:
-                errors.setdefault('email', []).append('Email не должен превышать 254 символа.')
-
-        # Валидация username
+                errors.setdefault(
+                    'email', []
+                ).append('Email не должен превышать 254 символа.')
         if not username:
-            errors['username'] = ['Это поле обязательно для заполнения.']
+            errors['username'] = [REQUIRED_FIELD_PHRASE]
         elif username == 'me':
             errors['username'] = ['Введите корректный username']
         elif len(username) > 150:
-            errors.setdefault('username', []).append('Username не должен превышать 150 символов.')
+            errors.setdefault(
+                'username', []
+            ).append('Username не должен превышать 150 символов.')
         elif not re.fullmatch(r'^[\w.@+-]+\Z', username):
             errors['username'] = ['Username имеет недопустимые символы']
-
-        # Если есть ошибки, возвращаем их в ответе
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
         user, created = User.objects.get_or_create(
@@ -125,22 +130,22 @@ class TokenView(APIView):
     def post(self, request):
         username = request.data.get('username')
         confirmation_code = request.data.get('confirmation_code')
-
         errors = {}
-
         if not username:
-            errors['username'] = ['Это поле обязательно для заполнения.']
+            errors['username'] = [REQUIRED_FIELD_PHRASE]
         elif username == 'me':
             errors['username'] = ['Введите корректный username']
         elif len(username) > 150:
-            errors.setdefault('username', []).append('Username не должен превышать 150 символов.')
+            errors.setdefault(
+                'username', []
+            ).append('Username не должен превышать 150 символов.')
         elif not re.fullmatch(r'^[\w.@+-]+\Z', username):
             errors['username'] = ['Username имеет недопустимые символы.']
         else:
             try:
                 user = User.objects.get(username=username)
                 if not confirmation_code:
-                    errors['confirmation_code'] = ['Это поле обязательно для заполнения.']
+                    errors['confirmation_code'] = [REQUIRED_FIELD_PHRASE]
                 if user.confirmation_code != confirmation_code:
                     errors['confirmation_code'] = ['Не верный код.']
             except User.DoesNotExist:
@@ -152,9 +157,8 @@ class TokenView(APIView):
                 )
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
-
         refresh = RefreshToken.for_user(user)
-        user.confirmation_code = ""
+        user.confirmation_code = ''
         user.save()
         return Response({
             'access': str(refresh.access_token),
@@ -163,7 +167,9 @@ class TokenView(APIView):
 
 
 class TitleViewSet(viewsets.ModelViewSet):
-    queryset = Title.objects.select_related('category').prefetch_related('genre').all()
+    queryset = Title.objects.select_related(
+        'category'
+    ).prefetch_related('genre').all()
     serializer_class = TitleSerializer
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
@@ -178,19 +184,24 @@ class TitleViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         return Response(
-            {"detail": "Метод PUT не поддерживается."},
+            {'detail': 'Метод PUT не поддерживается.'},
             status=status.HTTP_405_METHOD_NOT_ALLOWED
         )
 
     def partial_update(self, request, *args, **kwargs):
         """Обработка PATCH-запроса с валидацией длины поля `name`."""
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer = self.get_serializer(
+            instance,
+            data=request.data,
+            partial=True
+        )
         if serializer.is_valid():
             name = request.data.get('name', '')
             if len(name) > 256:
                 return Response(
-                    {"detail": "Название произведения не может быть длиннее 256 символов."},
+                    {'detail': 'Название произведения'
+                     'не может быть длиннее 256 символов.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             serializer.save()
@@ -280,13 +291,13 @@ class ReviewViewSet(viewsets.ModelViewSet):
                 score = float(score)
             except (ValueError, TypeError):
                 return Response(
-                    {"detail": "Оценка должна быть числом."},
+                    {'detail': 'Оценка должна быть числом.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
             if score < 1 or score > 10:
                 return Response(
-                    {"detail": "Оценка должна быть от 1 до 10."},
+                    {'detail': 'Оценка должна быть от 1 до 10.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -328,20 +339,20 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user, review=review)
 
     def post(self, request, *args, **kwargs):
-        """Обработка POST-запросов для детализированного эндпоинта (не поддерживается)."""
+        """Обработка POST-запросов для детализированного эндпоинта."""
         if not request.user.is_authenticated:
             return Response(
-                {"detail": "Authentication credentials were not provided."},
+                {'detail': 'Вы не авторизованы.'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
         return Response(
-            {"detail": "Метод POST не поддерживается для этого эндпоинта."},
+            {'detail': 'Метод POST не поддерживается для этого эндпоинта.'},
             status=status.HTTP_405_METHOD_NOT_ALLOWED
         )
 
     def update(self, request, *args, **kwargs):
         return Response(
-            {"detail": "Метод PUT не поддерживается."},
+            {'detail': 'Метод PUT не поддерживается.'},
             status=status.HTTP_405_METHOD_NOT_ALLOWED
         )
 
@@ -352,10 +363,3 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
-    
-
-
-
-    # def destroy(self, request, *args, **kwargs):
-    #     """Удаление комментария."""
-    #     return super().destroy(request, *args, **kwargs)
