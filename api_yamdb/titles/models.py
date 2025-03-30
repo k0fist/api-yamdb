@@ -1,7 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models import Avg
-from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class User(AbstractUser):
@@ -36,8 +35,24 @@ class User(AbstractUser):
         return self.username
 
 
+class Genre(models.Model):
+    name = models.CharField(max_length=256, unique=True)
+    slug = models.SlugField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Category(models.Model):
+    name = models.CharField(max_length=256, unique=True)
+    slug = models.SlugField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Title(models.Model):
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=256)
     category = models.ForeignKey(
         'Category',
         on_delete=models.SET_NULL,
@@ -47,7 +62,7 @@ class Title(models.Model):
     genre = models.ManyToManyField('Genre', related_name='titles')
     year = models.PositiveIntegerField()
     description = models.TextField(blank=True, null=True)
-    rating = models.FloatField(null=True, blank=True)  # Средний рейтинг
+    rating = models.FloatField(null=True, blank=True)
 
     def update_rating(self):
         """Обновляет среднюю оценку произведения."""
@@ -59,57 +74,3 @@ class Title(models.Model):
             else None
         )
         self.save()
-
-
-class Review(models.Model):
-    title = models.ForeignKey(
-        Title,
-        on_delete=models.CASCADE,
-        related_name='reviews'
-    )
-    author = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='user_reviews'
-    )
-    text = models.TextField()
-    score = models.IntegerField(
-        validators=[MinValueValidator(1), MaxValueValidator(10)]
-    )
-    pub_date = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=['title', 'author'],
-                name='unique_review_per_title'
-            )
-        ]
-
-
-class Genre(models.Model):
-    name = models.CharField(max_length=256, unique=True)
-    slug = models.SlugField(max_length=50, unique=True)
-
-
-class Category(models.Model):
-    name = models.CharField(max_length=256, unique=True)
-    slug = models.SlugField(max_length=50, unique=True)
-
-
-class Comment(models.Model):
-    review = models.ForeignKey(
-        'Review',
-        on_delete=models.CASCADE,
-        related_name='comments'
-    )
-    author = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='comments'
-    )
-    text = models.TextField()
-    pub_date = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-pub_date']
