@@ -4,12 +4,12 @@ from titles.models import Title
 
 class TitleFilter(django_filters.FilterSet):
     genre = django_filters.CharFilter(
-        field_name="genre__slug",
-        method="filter_genre"
+        field_name='genre__slug',
+        method='filter_genre'
     )
     category = django_filters.CharFilter(
-        field_name="category__slug",
-        method="filter_category"
+        field_name='category__slug',
+        method='filter_category'
     )
 
     def filter_genre(self, queryset, name, value):
