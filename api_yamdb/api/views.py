@@ -26,6 +26,7 @@ from .serializers import (
 from .permissions import AdminPermission, IsAuthorOrAdminOrModerator
 from .filters import TitleFilter
 
+
 User = get_user_model()
 
 REQUIRED_FIELD_PHRASE = 'Это поле обязательно для заполнения.'
@@ -42,9 +43,9 @@ class UserView(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     @action(
-            detail=False,
-            methods=['get', 'patch'],
-            permission_classes=(IsAuthenticated,)
+        detail=False,
+        methods=['get', 'patch'],
+        permission_classes=(IsAuthenticated,)
     )
     def me(self, request, *args, **kwargs):
         user = request.user
@@ -64,12 +65,28 @@ class UserView(viewsets.ModelViewSet):
             )
 
 
+def validate_username(username):
+    errors = {}
+    if not username:
+        errors['username'] = [REQUIRED_FIELD_PHRASE]
+    elif username == 'me':
+        errors['username'] = ['Введите корректный username']
+    elif len(username) > 150:
+        errors.setdefault(
+            'username', []
+        ).append('Username не должен превышать 150 символов.')
+    elif not re.fullmatch(r'^[\w.@+-]+\Z', username):
+        errors['username'] = ['Username имеет недопустимые символы']
+    return errors
+
+
 class SignupView(APIView):
     """Регистрация нового пользовователя."""
-    
+
     def post(self, request):
         email = request.data.get('email', '').strip()
         username = request.data.get('username', '').strip()
+
         errors = {}
         if User.objects.filter(email=email).exists():
             if not User.objects.filter(username=username).exists():
@@ -88,18 +105,11 @@ class SignupView(APIView):
                 errors.setdefault(
                     'email', []
                 ).append('Email не должен превышать 254 символа.')
-        if not username:
-            errors['username'] = [REQUIRED_FIELD_PHRASE]
-        elif username == 'me':
-            errors['username'] = ['Введите корректный username']
-        elif len(username) > 150:
-            errors.setdefault(
-                'username', []
-            ).append('Username не должен превышать 150 символов.')
-        elif not re.fullmatch(r'^[\w.@+-]+\Z', username):
-            errors['username'] = ['Username имеет недопустимые символы']
+        errors.update(validate_username(username))
+
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
         user, created = User.objects.get_or_create(
             username=username,
             defaults={'email': email}
@@ -130,17 +140,8 @@ class TokenView(APIView):
         username = request.data.get('username')
         confirmation_code = request.data.get('confirmation_code')
         errors = {}
-        if not username:
-            errors['username'] = [REQUIRED_FIELD_PHRASE]
-        elif username == 'me':
-            errors['username'] = ['Введите корректный username']
-        elif len(username) > 150:
-            errors.setdefault(
-                'username', []
-            ).append('Username не должен превышать 150 символов.')
-        elif not re.fullmatch(r'^[\w.@+-]+\Z', username):
-            errors['username'] = ['Username имеет недопустимые символы.']
-        else:
+        errors.update(validate_username(username))
+        if not errors:
             try:
                 user = User.objects.get(username=username)
                 if not confirmation_code:
