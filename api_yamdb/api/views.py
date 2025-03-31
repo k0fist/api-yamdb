@@ -1,4 +1,3 @@
-
 from rest_framework import viewsets, mixins, serializers, status, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -67,7 +66,7 @@ class UserView(viewsets.ModelViewSet):
 
 class SignupView(APIView):
     """Регистрация нового пользовователя."""
-
+    
     def post(self, request):
         email = request.data.get('email', '').strip()
         username = request.data.get('username', '').strip()
