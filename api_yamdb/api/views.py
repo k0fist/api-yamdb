@@ -131,17 +131,13 @@ class TitleViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.select_related(
         'category'
     ).prefetch_related('genre').all()
+    serializer_class = TitleSerializer
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = TitleFilter
     search_fields = ['name']
     permission_classes = [AllowAny]
     http_method_names = ['get', 'post', 'patch', 'delete']
-
-    def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
-            return TitleCreateUpdateSerializer
-        return TitleReadSerializer
 
     def get_permissions(self):
         self.permission_classes = [AdminPermission] if self.action not in ['list', 'retrieve'] else [AllowAny]
