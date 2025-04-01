@@ -26,6 +26,10 @@ INSTALLED_APPS = [
     'djoser',
 ]
 
+PIN_CODE_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
+PIN_CODE_LENGTH = 6
+FROM_EMAIL = 'sirotkin.201515@gmail.com'
 AUTH_USER_MODEL = 'titles.User'
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
