@@ -20,8 +20,8 @@ import re
 from titles.models import Title, Category, Genre
 from reviews.models import Review
 from .serializers import (
-    TitleSerializer, CategorySerializer, GenreSerializer,
-    UserSerializer, ReviewSerializer, CommentSerializer
+    TitleCreateUpdateSerializer, TitleReadSerializer, CategorySerializer,
+    GenreSerializer, UserSerializer, ReviewSerializer, CommentSerializer
 )
 from .permissions import AdminPermission, IsAuthorOrAdminOrModerator
 from .filters import TitleFilter
@@ -170,12 +170,16 @@ class TitleViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.select_related(
         'category'
     ).prefetch_related('genre').all()
-    serializer_class = TitleSerializer
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = TitleFilter
     search_fields = ['name']
     permission_classes = [AllowAny]
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return TitleCreateUpdateSerializer
+        return TitleReadSerializer
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:

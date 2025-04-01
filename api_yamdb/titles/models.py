@@ -5,12 +5,14 @@ from django.db.models import Avg
 
 class User(AbstractUser):
     """Переопределение страндартной модели пользователя."""
+    ADMIN = 'admin'
+    MODERATOR = 'moderator'
+    USER = 'user'
 
     ROLE_CHOICES = [
-        ('user', 'User'),
-        ('moderator', 'Moderator'),
-        ('admin', 'Admin'),
-        ('superuser', 'Superuser'),
+        (ADMIN, 'Admin'),
+        (MODERATOR, 'Moderator'),
+        (USER, 'User'),
     ]
     confirmation_code = models.TextField(
         'Код подтверждения',
@@ -22,6 +24,8 @@ class User(AbstractUser):
         choices=ROLE_CHOICES,
         default='user'
     )
+    email = models.EmailField(unique=True)
+    username = models.CharField(max_length=150, unique=True)
 
     def save(self, *args, **kwargs):
         """Переопределение метода save для автоматической установки роли."""
@@ -30,6 +34,16 @@ class User(AbstractUser):
         elif self.is_staff:
             self.role = 'admin'
         super().save(*args, **kwargs)
+
+    def is_admin(self):
+        """Проверяет, является ли пользователь администратором."""
+        return self.role == self.ADMIN or self.is_staff
+
+    def is_moderator_or_admin(self):
+        """
+        Проверяет, является ли пользователь модератором или администратором.
+        """
+        return self.role in {self.ADMIN, self.MODERATOR} or self.is_staff
 
     def __str__(self):
         return self.username
@@ -54,12 +68,12 @@ class Category(models.Model):
 class Title(models.Model):
     name = models.CharField(max_length=256)
     category = models.ForeignKey(
-        'Category',
+        Category,
         on_delete=models.SET_NULL,
         null=True,
         related_name='titles'
     )
-    genre = models.ManyToManyField('Genre', related_name='titles')
+    genre = models.ManyToManyField(Genre, related_name='titles')
     year = models.PositiveIntegerField()
     description = models.TextField(blank=True, null=True)
     rating = models.FloatField(null=True, blank=True)
