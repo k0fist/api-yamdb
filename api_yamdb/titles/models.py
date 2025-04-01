@@ -2,6 +2,8 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models import Avg
 
+from .validators import validate_username
+
 
 class User(AbstractUser):
     """Переопределение страндартной модели пользователя."""
@@ -16,6 +18,8 @@ class User(AbstractUser):
         'Код подтверждения',
         default=''
     )
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(unique=True)
     bio = models.TextField(blank=True, null=True)
     role = models.CharField(
         max_length=50,
@@ -30,6 +34,10 @@ class User(AbstractUser):
         elif self.is_staff:
             self.role = 'admin'
         super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        validate_username(self.username)
 
     def __str__(self):
         return self.username

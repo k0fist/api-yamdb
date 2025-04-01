@@ -1,9 +1,12 @@
-from rest_framework import serializers
+from rest_framework import serializers, status
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import get_user_model
-
+from rest_framework_simplejwt.tokens import RefreshToken
 from titles.models import Title, Category, Genre
 from reviews.models import Review, Comment
+from titles.validators import validate_username
+from datetime import datetime
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 User = get_user_model()
@@ -24,21 +27,34 @@ class UserSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, data):
+        """Общая валидация."""
         if User.objects.filter(username=data.get('username')).exists():
-            raise serializers.ValidationError('Username уже занят.')
+            if not User.objects.filter(email=data.get('email')).exists():
+                raise serializers.ValidationError('Username уже занят.')
         if User.objects.filter(email=data.get('email')).exists():
-            raise serializers.ValidationError('Email уже занят.')
+            if not User.objects.filter(username=data.get('username')).exists():
+                raise serializers.ValidationError('Email уже занят.')
 
         return data
 
     def validate_username(self, value):
-        """Проверка, что username соответствует регулярному выражению."""
-        if value:
-            import re
-            if not re.match(r'^[\w.@+-]+\Z', value):
-                raise serializers.ValidationError('Такие символы '
-                                                  'запрещены в username.')
+        """Валидация username."""
+        validate_username(value)
         return value
+
+
+class TokenSerializer(serializers.ModelSerializer):
+
+    username = serializers.CharField(max_length=150, required=True)
+    confirmation_code = serializers.CharField(max_length=6, required=True)
+
+    class Meta:
+        """Настройки для сериализации модели User."""
+
+        model = get_user_model()
+        fields = (
+            'username', 'confirmation_code'
+        )
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -90,6 +106,7 @@ class TitleSerializer(serializers.ModelSerializer):
         queryset=Genre.objects.all(),
         slug_field='slug', many=True, write_only=True
     )
+    name = serializers.CharField(max_length=256)
 
     class Meta:
         model = Title
@@ -117,6 +134,14 @@ class TitleSerializer(serializers.ModelSerializer):
                                               'быть длиннее 256 символов.')
         return value
 
+    def validate_year(self, value):
+        current_year = datetime.now().year
+        if value and int(value) > current_year:
+            raise serializers.ValidationError(
+                {'year': 'Год: {year} не может быть больше текущего.'}
+            )
+        return value
+
 
 class ReviewSerializer(serializers.ModelSerializer):
     author = serializers.SlugRelatedField(
@@ -128,10 +153,19 @@ class ReviewSerializer(serializers.ModelSerializer):
         format='%Y-%m-%dT%H:%M:%SZ',
         read_only=True
     )
+    score = serializers.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(10)]
+    )
 
     class Meta:
         model = Review
         fields = ['id', 'title', 'author', 'text', 'score', 'pub_date']
+
+    # def validate_score(self, value):
+    #     """Валидация оценки (score)"""
+    #     if value < 1 or value > 10:
+    #         raise serializers.ValidationError('Оценка должна быть от 1 до 10.')
+    #     return value
 
     def validate(self, data):
         request = self.context.get('request')
@@ -154,3 +188,4 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['id', 'text', 'author', 'pub_date']
+    
