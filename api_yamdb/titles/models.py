@@ -20,10 +20,13 @@ class User(AbstractUser):
     ]
     confirmation_code = models.TextField(
         'Код подтверждения',
+        max_length=6,
         default=''
     )
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField(unique=True)
+    username = models.CharField(max_length=150, unique=True, validators=[validate_username])
+    email = models.EmailField(max_length=254, unique=True)  # Уникальный email
+    first_name = models.CharField(max_length=150, blank=True)  # Необязательное поле для имени
+    last_name = models.CharField(max_length=150, blank=True)
     bio = models.TextField(blank=True, null=True)
     role = models.CharField(
         max_length=50,
