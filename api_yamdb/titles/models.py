@@ -5,11 +5,13 @@ from django.db.models import Avg
 from .validators import validate_username
 
 
+ADMIN = 'admin'
+MODERATOR = 'moderator'
+USER = 'user'
+
+
 class User(AbstractUser):
     """Переопределение страндартной модели пользователя."""
-    ADMIN = 'admin'
-    MODERATOR = 'moderator'
-    USER = 'user'
 
     ROLE_CHOICES = [
         (ADMIN, 'Admin'),
@@ -42,6 +44,12 @@ class User(AbstractUser):
     def clean(self):
         super().clean()
         validate_username(self.username)
+
+    def is_admin(self):
+        return self.role == ADMIN or self.is_staff
+    
+    def is_moderator_or_admin(self):
+        return self.role in {ADMIN, MODERATOR} or self.is_staff
 
     def __str__(self):
         return self.username
