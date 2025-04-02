@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from titles.models import Title, Category, Genre
-from reviews.models import Review, Comment
-from titles.validators import validate_username
+
+from reviews.models import Review, Comment, Title, Category, Genre
+from reviews.validators import validate_username
 
 
 User = get_user_model()

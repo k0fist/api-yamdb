@@ -1,3 +1,10 @@
+import random
+
+from django.conf import settings
+from django.core.mail import send_mail
+from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, mixins, status, filters
 from rest_framework.response import Response
 from rest_framework.filters import SearchFilter
@@ -5,15 +12,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import action, api_view
-from django.conf import settings
-from django_filters.rest_framework import DjangoFilterBackend
-from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
-from django.shortcuts import get_object_or_404
 
-import random
-from titles.models import Title, Category, Genre
-from reviews.models import Review
+from reviews.models import Review, Title, Category, Genre
 from .serializers import (
     CategorySerializer, GenreSerializer,
     TitleCreateUpdateSerializer, TitleReadSerializer,
@@ -24,7 +24,7 @@ from .permissions import (
     AdminPermission, IsAuthorOrAdminOrModerator, ReadOnlyPermission
 )
 from .filters import TitleFilter
-from titles.validators import USER_ME
+from reviews.validators import USER_ME
 
 
 User = get_user_model()
@@ -66,7 +66,10 @@ def signup(request):
     if serializer.is_valid():
         email = serializer.validated_data['email']
         username = serializer.validated_data['username']
-        user, created = User.objects.get_or_create(username=username, defaults={'email': email})
+        user, created = User.objects.get_or_create(
+            username=username,
+            defaults={'email': email}
+        )
 
         confirmation_code = ''.join(
             random.choices(
