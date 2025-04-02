@@ -16,15 +16,14 @@ from django.shortcuts import get_object_or_404
 import uuid
 import re
 import random
-from titles.models import Title, Category, Genre
-from reviews.models import Review
+from reviews.models import Review, Title, Category, Genre
 from .serializers import (
     TitleSerializer, CategorySerializer, GenreSerializer,
     UserSerializer, ReviewSerializer, CommentSerializer, TokenSerializer
 )
 from .permissions import AdminPermission, IsAuthorOrAdminOrModerator
 from .filters import TitleFilter
-from titles.validators import validate_username, REQUIRED_FIELD_PHRASE, USER_ME
+from reviews.validators import validate_username, USER_ME
 
 
 User = get_user_model()

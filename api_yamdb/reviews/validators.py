@@ -1,4 +1,6 @@
 import re
+import datetime
+
 from django.core.exceptions import ValidationError
 
 REQUIRED_FIELD_PHRASE = 'Это поле обязательно для заполнения.'
@@ -16,4 +18,12 @@ def validate_username(username):
         raise ValidationError(
             {'username': ['Поле username: {username} '
                           'имеет недопустимые символы']}
+        )
+
+
+def validate_year(value):
+    current_year = datetime.datetime.now().year
+    if value < -999999 or value > current_year:
+        raise ValidationError(
+            f'Год должен быть в пределах от -999999 до {current_year}.'
         )

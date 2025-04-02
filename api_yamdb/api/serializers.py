@@ -1,12 +1,11 @@
-from rest_framework import serializers, status
+from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.tokens import RefreshToken
-from titles.models import Title, Category, Genre
-from reviews.models import Review, Comment
-from titles.validators import validate_username
 from datetime import datetime
 from django.core.validators import MinValueValidator, MaxValueValidator
+
+from reviews.validators import validate_username
+from reviews.models import Review, Comment, Title, Category, Genre
 
 
 User = get_user_model()
@@ -50,7 +49,6 @@ class TokenSerializer(serializers.ModelSerializer):
 
     class Meta:
         """Настройки для сериализации модели User."""
-
         model = get_user_model()
         fields = (
             'username', 'confirmation_code'
@@ -188,4 +186,3 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['id', 'text', 'author', 'pub_date']
-    
