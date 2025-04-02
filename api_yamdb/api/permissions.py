@@ -1,6 +1,13 @@
 from rest_framework import permissions
 
 
+class ReadOnlyPermission(permissions.BasePermission):
+    """Анонимные или обычные залогиненные пользователи могут только читать."""
+
+    def has_permission(self, request, view):
+        return request.method in permissions.SAFE_METHODS
+
+
 class AdminPermission(permissions.BasePermission):
 
     def has_permission(self, request, view):

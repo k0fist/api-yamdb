@@ -1,7 +1,7 @@
 from rest_framework import viewsets, mixins, status, filters
 from rest_framework.response import Response
 from rest_framework.filters import SearchFilter
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import action, api_view
@@ -20,7 +20,9 @@ from .serializers import (
     UserSerializer, ReviewSerializer,
     CommentSerializer, TokenSerializer, SignUpSerializer
 )
-from .permissions import AdminPermission, IsAuthorOrAdminOrModerator
+from .permissions import (
+    AdminPermission, IsAuthorOrAdminOrModerator, ReadOnlyPermission
+)
 from .filters import TitleFilter
 from titles.validators import USER_ME
 
@@ -125,19 +127,13 @@ class TitleViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = TitleFilter
     search_fields = ['name']
-    permission_classes = [AllowAny]
+    permission_classes = (ReadOnlyPermission | AdminPermission,)
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return TitleCreateUpdateSerializer
         return TitleReadSerializer
-
-    def get_permissions(self):
-        self.permission_classes = ([AdminPermission]
-                                   if self.action
-                                   not in ['list', 'retrieve'] else [AllowAny])
-        return super().get_permissions()
 
 
 class BaseViewSet_Category_Genre(
@@ -150,13 +146,9 @@ class BaseViewSet_Category_Genre(
     filter_backends = (DjangoFilterBackend, SearchFilter)
     search_fields = ('name',)
     lookup_field = 'slug'
-    permission_classes = [AllowAny]
-
-    def get_permissions(self):
-        self.permission_classes = ([AdminPermission]
-                                   if self.action
-                                   not in ['list', 'retrieve'] else [AllowAny])
-        return super().get_permissions()
+    permission_classes = (
+        ReadOnlyPermission | AdminPermission,
+    )
 
     def __str__(self):
         return self.name
@@ -183,16 +175,9 @@ def get_field(model, id):
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
-
-    def get_permissions(self):
-        """Определяет разрешения в зависимости от действия."""
-        if self.action in ['list', 'retrieve']:
-            return [AllowAny()]
-        elif self.action == 'create':
-            return [IsAuthenticated()]
-        elif self.action in ['update', 'partial_update', 'destroy']:
-            return [IsAuthorOrAdminOrModerator()]
-        return []
+    permission_classes = (
+        ReadOnlyPermission | IsAuthorOrAdminOrModerator | AdminPermission,
+    )
 
     def get_queryset(self):
         return get_field(
@@ -209,36 +194,17 @@ class ReviewViewSet(viewsets.ModelViewSet):
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
-
-    def get_permissions(self):
-        """Определяет разрешения в зависимости от действия."""
-        if self.action in ['list', 'retrieve']:
-            return [AllowAny()]
-        elif self.action == 'create':
-            return [IsAuthenticated()]
-        elif self.action in ['update', 'partial_update', 'destroy']:
-            return [IsAuthorOrAdminOrModerator()]
-        return []
+    permission_classes = (
+        ReadOnlyPermission | IsAuthorOrAdminOrModerator | AdminPermission,
+    )
 
     def get_queryset(self):
         """Получить все комментарии к отзыву."""
         return get_field(Review, self.kwargs['review_id']).comments.all()
-    
+
     def perform_create(self, serializer):
         """Добавить новый комментарий к отзыву."""
         serializer.save(
             author=self.request.user,
             review=get_field(Review, self.kwargs['review_id'])
         )
-
-    # def post(self, request, *args, **kwargs):
-    #     """Обработка POST-запросов для детализированного эндпоинта."""
-    #     if not request.user.is_authenticated:
-    #         return Response(
-    #             {'detail': 'Вы не авторизованы.'},
-    #             status=status.HTTP_401_UNAUTHORIZED
-    #         )
-    #     return Response(
-    #         {'detail': 'Метод POST не поддерживается для этого эндпоинта.'},
-    #         status=status.HTTP_405_METHOD_NOT_ALLOWED
-    #     )
