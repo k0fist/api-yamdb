@@ -20,13 +20,16 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_filters',
     'api',
-    'titles',
     'reviews',
     'rest_framework',
     'djoser',
 ]
 
-AUTH_USER_MODEL = 'titles.User'
+PIN_CODE_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
+PIN_CODE_LENGTH = 6
+FROM_EMAIL = 'sirotkin.201515@gmail.com'
+AUTH_USER_MODEL = 'reviews.User'
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
@@ -106,9 +109,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ru'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Moscow'
 
 USE_I18N = True
 
