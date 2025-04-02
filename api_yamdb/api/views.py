@@ -139,7 +139,7 @@ class TitleViewSet(viewsets.ModelViewSet):
         return TitleReadSerializer
 
 
-class BaseViewSet_Category_Genre(
+class BaseViewSetCategoryGenre(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
     mixins.DestroyModelMixin,
@@ -158,14 +158,14 @@ class BaseViewSet_Category_Genre(
 
 
 class CategoryViewSet(
-    BaseViewSet_Category_Genre
+    BaseViewSetCategoryGenre
 ):
     queryset = Category.objects.all().order_by('name')
     serializer_class = CategorySerializer
 
 
 class GenreViewSet(
-    BaseViewSet_Category_Genre
+    BaseViewSetCategoryGenre
 ):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
