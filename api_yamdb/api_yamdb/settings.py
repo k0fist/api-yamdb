@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import timedelta
+import string
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -25,7 +26,7 @@ INSTALLED_APPS = [
     'djoser',
 ]
 
-PIN_CODE_CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+PIN_CODE_CHARACTERS = string.ascii_uppercase + string.digits
 
 PIN_CODE_LENGTH = 6
 FROM_EMAIL = 'sirotkin.201515@gmail.com'

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 from reviews.models import Review, Comment, Title, Category, Genre
 from reviews.validators import validate_username
@@ -7,58 +8,68 @@ from reviews.validators import validate_username
 
 User = get_user_model()
 
+USERNAME_LENGTH_MAX = 150
+EMAIL_LENGTH_MAX = 254
 
-class BaseUserSignupSerializer(serializers.ModelSerializer):
+
+class UserValidationMixin:
+
     def validate_username(self, username):
         """Валидация username."""
-        validate_username(username)
-        return username
+        return validate_username(username)
+
+    def validate_email(self, email):
+        """Валидация email, разрешаем повторное использование."""
+        user = User.objects.filter(email=email).first()
+        if user:
+            return email
+        return email
 
 
-class UserSerializer(BaseUserSignupSerializer):
+class SignUpValidationMixin:
+    def validate(self, data):
+        """Проверяем соответствие username и email."""
+        username = data.get("username")
+        email = data.get("email")
+        user = User.objects.filter(username=username).first()
+        if user:
+            if user.email != email:
+                raise ValidationError(
+                    "Этот username уже зарегистрирован с другим email."
+                )
+            return data
+        if User.objects.filter(email=email).exists():
+            raise ValidationError("Этот email уже зарегистрирован.")
+        return data
+
+
+class UserSerializer(UserValidationMixin, serializers.ModelSerializer):
 
     class Meta:
-        """Настройки для сериализации модели User."""
-
         model = User
         fields = (
             'username', 'email', 'first_name', 'last_name', 'bio', 'role'
         )
 
 
-class SignUpSerializer(BaseUserSignupSerializer):
-    username = serializers.CharField(max_length=150, required=True)
-    email = serializers.EmailField(max_length=254, required=True)
-
-    class Meta:
-        """Настройки для сериализации модели User."""
-
-        model = User
-        fields = (
-            'username', 'email'
-        )
-
-    def validate(self, data):
-        """Общая валидация."""
-        if User.objects.filter(username=data.get('username')).exists():
-            if not User.objects.filter(email=data.get('email')).exists():
-                raise serializers.ValidationError('Username уже занят.')
-        if User.objects.filter(email=data.get('email')).exists():
-            if not User.objects.filter(username=data.get('username')).exists():
-                raise serializers.ValidationError('Email уже занят.')
-
-        return data
+class SignUpSerializer(
+    UserValidationMixin, SignUpValidationMixin, serializers.Serializer
+):
+    username = serializers.CharField(
+        max_length=USERNAME_LENGTH_MAX,
+        required=True
+    )
+    email = serializers.EmailField(max_length=EMAIL_LENGTH_MAX, required=True)
 
 
-class TokenSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        """Настройки для сериализации модели User."""
-
-        model = User
-        fields = (
-            'username', 'confirmation_code'
-        )
+class TokenSerializer(UserValidationMixin, serializers.Serializer):
+    """Сериализатор для запроса токена."""
+    username = serializers.CharField(
+        max_length=USERNAME_LENGTH_MAX,
+        help_text="Имя пользователя.")
+    confirmation_code = serializers.CharField(
+        help_text="Код подтверждения, отправленный на почту."
+    )
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -76,26 +87,19 @@ class GenreSerializer(serializers.ModelSerializer):
 
 
 class TitleReadSerializer(serializers.ModelSerializer):
-    rating = serializers.SerializerMethodField()
+#review/version_2.1
+    #rating = serializers.SerializerMethodField()
+
+    category = CategorySerializer()
+    genre = GenreSerializer(many=True)
+
 
     class Meta:
         model = Title
         fields = ('id', 'name', 'year',
                   'category', 'genre', 'description', 'rating'
                   )
-
-    def to_representation(self, instance):
-        """Изменяем вывод данных для соответствия ожидаемому формату."""
-        representation = super().to_representation(instance)
-        representation['category'] = {
-            'name': instance.category.name,
-            'slug': instance.category.slug
-        }
-        representation['genre'] = [
-            {'name': genre.name, 'slug': genre.slug}
-            for genre in instance.genre.all()
-        ]
-        return representation
+        read_only_fields = fields
 
     def get_rating(self, obj):
         reviews = obj.reviews.all()
@@ -121,6 +125,19 @@ class TitleCreateUpdateSerializer(serializers.ModelSerializer):
                   'category', 'genre', 'description'
                   )
 
+    def to_representation(self, instance):
+        """Изменяем вывод данных для соответствия ожидаемому формату."""
+        representation = super().to_representation(instance)
+        representation['category'] = {
+            'name': instance.category.name,
+            'slug': instance.category.slug
+        }
+        representation['genre'] = [
+            {'name': genre.name, 'slug': genre.slug}
+            for genre in instance.genre.all()
+        ]
+        return representation
+
 
 class ReviewSerializer(serializers.ModelSerializer):
     author = serializers.SlugRelatedField(
@@ -137,7 +154,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         if request.method != 'POST':
             return data
         user = request.user
-        title_id = self.context['view'].kwargs.get('title_id')
+        title_id = self.context['view'].kwargs['title_id']
         if Review.objects.filter(title_id=title_id, author=user).exists():
             raise serializers.ValidationError(
                 'Вы уже оставили отзыв к этому заголовку.'
