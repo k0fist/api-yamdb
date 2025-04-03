@@ -87,12 +87,10 @@ class GenreSerializer(serializers.ModelSerializer):
 
 
 class TitleReadSerializer(serializers.ModelSerializer):
-#review/version_2.1
-    #rating = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
 
     category = CategorySerializer()
     genre = GenreSerializer(many=True)
-
 
     class Meta:
         model = Title
