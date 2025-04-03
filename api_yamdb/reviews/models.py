@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 
@@ -10,6 +11,8 @@ MAX_SCORE = 10
 ADMIN = 'admin'
 MODERATOR = 'moderator'
 USER = 'user'
+SIZE_USERNAME = 150
+SIZE_EMAIL = 254
 
 
 class User(AbstractUser):
@@ -22,16 +25,18 @@ class User(AbstractUser):
     ]
     confirmation_code = models.CharField(
         verbose_name='Код подтверждения',
-        max_length=6,
+        max_length=settings.PIN_CODE_LENGTH,
         default=''
     )
     username = models.CharField(
         verbose_name='Имя пользователя',
-        max_length=150,
-        unique=True
+        max_length=SIZE_USERNAME,
+        unique=True,
+        validators=[validate_username]
     )
     email = models.EmailField(
         verbose_name='Электронная почта',
+        max_length=SIZE_EMAIL,
         unique=True
     )
     bio = models.TextField(
@@ -41,28 +46,16 @@ class User(AbstractUser):
     )
     role = models.CharField(
         verbose_name='Роль',
-        max_length=max(len(choice[0]) for choice in ROLE_CHOICES),
+        max_length=max(len(role) for role, _ in ROLE_CHOICES),
         choices=ROLE_CHOICES,
         default=USER
     )
 
-    def save(self, *args, **kwargs):
-        """Переопределение метода save для автоматической установки роли."""
-        if self.is_superuser:
-            self.role = 'superuser'
-        elif self.is_staff:
-            self.role = 'admin'
-        super().save(*args, **kwargs)
-
-    def clean(self):
-        super().clean()
-        validate_username(self.username)
-
     def is_admin(self):
         return self.role == ADMIN or self.is_staff
 
-    def is_moderator_or_admin(self):
-        return self.role in {ADMIN, MODERATOR} or self.is_staff
+    def is_moderator(self):
+        return self.role == MODERATOR
 
     def __str__(self):
         return self.username
@@ -96,7 +89,7 @@ class BaseNamedModel(models.Model):
 class Genre(BaseNamedModel):
     """Модель жанров."""
 
-    class Meta:
+    class Meta(BaseNamedModel.Meta):
         verbose_name = 'Жанр'
         verbose_name_plural = 'Жанры'
 
@@ -104,7 +97,7 @@ class Genre(BaseNamedModel):
 class Category(BaseNamedModel):
     """Модель категорий."""
 
-    class Meta:
+    class Meta(BaseNamedModel.Meta):
         verbose_name = 'Категория'
         verbose_name_plural = 'Категории'
 
@@ -136,28 +129,21 @@ class Title(models.Model):
         null=True
     )
 
-    @property
-    def rating(self):
-        """Вычисляем средний рейтинг произведения."""
-        reviews = self.reviews.all()
-        if reviews.exists():
-            return sum(review.score for review in reviews) / reviews.count()
-        return None
-
     def __str__(self):
         return self.name
 
     class Meta:
         verbose_name = 'Произведение'
         verbose_name_plural = 'Произведения'
+        ordering = ('name',)
 
 
-class BaseComment(models.Model):
+class BaseReviewComment(models.Model):
     """Базовая модель для отзывов и комментариев."""
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='%(class)s_comments',
+        related_name='%(class)ss',
         verbose_name='Автор'
     )
     text = models.TextField(verbose_name='Текст')
@@ -171,7 +157,7 @@ class BaseComment(models.Model):
         ordering = ('-pub_date',)
 
 
-class Review(BaseComment):
+class Review(BaseReviewComment):
     """Модель отзывов."""
     title = models.ForeignKey(
         Title,
@@ -187,7 +173,7 @@ class Review(BaseComment):
         verbose_name='Оценка'
     )
 
-    class Meta:
+    class Meta(BaseReviewComment.Meta):
         constraints = [
             models.UniqueConstraint(
                 fields=['title', 'author'],
@@ -198,7 +184,7 @@ class Review(BaseComment):
         verbose_name_plural = 'Отзывы'
 
 
-class Comment(BaseComment):
+class Comment(BaseReviewComment):
     """Модель комментариев к отзывам."""
     review = models.ForeignKey(
         Review,
@@ -207,6 +193,6 @@ class Comment(BaseComment):
         verbose_name='Отзыв'
     )
 
-    class Meta:
+    class Meta(BaseReviewComment.Meta):
         verbose_name = 'Комментарий'
         verbose_name_plural = 'Комментарии'

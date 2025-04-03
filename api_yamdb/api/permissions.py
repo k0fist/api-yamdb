@@ -20,6 +20,6 @@ class IsAuthorOrAdminOrModerator(permissions.IsAuthenticated):
             request.user.is_authenticated
             and (
                 obj.author == request.user
-                or request.user.is_moderator_or_admin()
+                or request.user.is_moderator()
             )
         )
