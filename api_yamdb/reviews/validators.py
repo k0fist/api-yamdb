@@ -19,6 +19,7 @@ def validate_username(username):
             {'username': ['Поле username: {username} '
                           'имеет недопустимые символы']}
         )
+    return username
 
 
 def validate_year(value):
