@@ -58,9 +58,16 @@ pip install -r requirements.txt
 python manage.py migrate
 ```
 
+Импортировать данные:
+
+```
+python manage.py import_data
+```
+
 Запустить проект:
 
 ```
 python manage.py runserver
 ```
- 
+
+После запуска полную документацию с примерами запросов можно посмотреть по адресу: http://127.0.0.1:8000/redoc/
