@@ -15,13 +15,11 @@ api_yamdb - YaMDb собирает отзывы пользователей на 
 
 ## Техно-стек
 
-- **Python 3.9** 
-- **Django 5.1.1** 
-- **Django REST Framework 3.15.2** 
+- **Python** 
+- **Django** 
+- **Django REST Framework** 
 - **Simple JWT** 
 - **SQLite3** 
-- **Requests 2.32.3** 
-- **pytest 8.3.3** 
 - **Flake8** 
 
 ### Как запустить проект:
@@ -70,4 +68,4 @@ python manage.py import_data
 python manage.py runserver
 ```
 
-После запуска полную документацию с примерами запросов можно посмотреть по адресу: http://127.0.0.1:8000/redoc/
+После запуска полную документацию с примерами запросов можно посмотреть по адресу: [redoc](http://127.0.0.1:8000/redoc/)

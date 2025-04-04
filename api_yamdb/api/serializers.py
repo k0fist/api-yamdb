@@ -20,6 +20,30 @@ class UserValidationMixin:
         return validate_username(username)
 
 
+    # def validate_email(self, email):
+    #     """Валидация email, разрешаем повторное использование."""
+    #     user = User.objects.filter(email=email).first()
+    #     if user:
+    #         return email
+    #     return email
+
+
+#class SignUpValidationMixin:
+ #   def validate(self, data):
+  #      """Проверяем соответствие username и email."""
+   #     username = data.get("username")
+    #    email = data.get("email")
+     #   user = User.objects.filter(username=username).first()
+      #  if user:
+       #     if user.email != email:
+        #        raise ValidationError(
+         #           "Этот username уже зарегистрирован с другим email."
+          #      )
+           # return data
+        #if User.objects.filter(email=email).exists():
+         #   raise ValidationError("Этот email уже зарегистрирован.")
+        #return data
+
 class UserSerializer(UserValidationMixin, serializers.ModelSerializer):
 
     class Meta:
