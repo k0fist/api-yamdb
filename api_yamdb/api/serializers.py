@@ -1,15 +1,16 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.conf import settings
 
-from reviews.models import Review, Comment, Title, Category, Genre
+from reviews.models import (
+    Review, Comment, Title, Category, Genre,
+    USERNAME_LENGTH_MAX, EMAIL_LENGTH_MAX
+)
 from reviews.validators import validate_username
 
 
 User = get_user_model()
-
-USERNAME_LENGTH_MAX = 150
-EMAIL_LENGTH_MAX = 254
 
 
 class UserValidationMixin:
@@ -18,12 +19,13 @@ class UserValidationMixin:
         """Валидация username."""
         return validate_username(username)
 
-    def validate_email(self, email):
-        """Валидация email, разрешаем повторное использование."""
-        user = User.objects.filter(email=email).first()
-        if user:
-            return email
-        return email
+
+    # def validate_email(self, email):
+    #     """Валидация email, разрешаем повторное использование."""
+    #     user = User.objects.filter(email=email).first()
+    #     if user:
+    #         return email
+    #     return email
 
 
 class SignUpValidationMixin:
@@ -52,9 +54,7 @@ class UserSerializer(UserValidationMixin, serializers.ModelSerializer):
         )
 
 
-class SignUpSerializer(
-    UserValidationMixin, SignUpValidationMixin, serializers.Serializer
-):
+class SignUpSerializer(UserValidationMixin, SignUpValidationMixin, serializers.Serializer):
     username = serializers.CharField(
         max_length=USERNAME_LENGTH_MAX,
         required=True
@@ -64,11 +64,9 @@ class SignUpSerializer(
 
 class TokenSerializer(UserValidationMixin, serializers.Serializer):
     """Сериализатор для запроса токена."""
-    username = serializers.CharField(
-        max_length=USERNAME_LENGTH_MAX,
-        help_text="Имя пользователя.")
+    username = serializers.CharField(max_length=USERNAME_LENGTH_MAX)
     confirmation_code = serializers.CharField(
-        help_text="Код подтверждения, отправленный на почту."
+        max_length=settings.PIN_CODE_LENGTH
     )
 
 
@@ -87,8 +85,7 @@ class GenreSerializer(serializers.ModelSerializer):
 
 
 class TitleReadSerializer(serializers.ModelSerializer):
-    rating = serializers.SerializerMethodField()
-
+    rating = serializers.FloatField(read_only=True)
     category = CategorySerializer()
     genre = GenreSerializer(many=True)
 
@@ -98,14 +95,6 @@ class TitleReadSerializer(serializers.ModelSerializer):
                   'category', 'genre', 'description', 'rating'
                   )
         read_only_fields = fields
-
-    def get_rating(self, obj):
-        reviews = obj.reviews.all()
-        if reviews.exists():
-            return round(
-                sum(review.score for review in reviews) / reviews.count(), 1
-            )
-        return None
 
 
 class TitleCreateUpdateSerializer(serializers.ModelSerializer):
@@ -125,16 +114,7 @@ class TitleCreateUpdateSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """Изменяем вывод данных для соответствия ожидаемому формату."""
-        representation = super().to_representation(instance)
-        representation['category'] = {
-            'name': instance.category.name,
-            'slug': instance.category.slug
-        }
-        representation['genre'] = [
-            {'name': genre.name, 'slug': genre.slug}
-            for genre in instance.genre.all()
-        ]
-        return representation
+        return TitleReadSerializer(instance).data
 
 
 class ReviewSerializer(serializers.ModelSerializer):

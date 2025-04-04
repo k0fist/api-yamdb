@@ -3,6 +3,7 @@ import random
 from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
+from django.db.models import Avg
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, mixins, status, filters
@@ -12,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, throttle_classes
 
 from reviews.models import Review, Title, Category, Genre
 from .serializers import (
@@ -25,7 +26,10 @@ from .permissions import (
     AdminPermission, IsAuthorOrAdminOrModerator, ReadOnlyPermission
 )
 from .filters import TitleFilter
-from reviews.validators import USER_ME
+
+# from reviews.validators import USER_ME
+from .trotllings import TokenRateThrottle
+
 
 
 User = get_user_model()
@@ -44,8 +48,8 @@ class UserView(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=['get', 'patch'],
-        url_path=USER_ME,
-        url_name=USER_ME,
+        url_path=settings.USER_ME,
+        url_name=settings.USER_ME,
         permission_classes=(IsAuthenticated,)
     )
     def myself(self, request, *args, **kwargs):
@@ -81,8 +85,7 @@ def signup(request):
 
     send_mail(
         'Код подтверждения',
-        f'Ваш код подтверждения для получения токена: {confirmation_code},'
-        ' никому не сообщайте его!',
+        f'Ваш код подтверждения для получения токена: {confirmation_code},',
         from_email=settings.FROM_EMAIL,
         recipient_list=[email]
     )
@@ -97,6 +100,7 @@ def signup(request):
 
 
 @api_view(['POST'])
+@throttle_classes([TokenRateThrottle])
 def token(request):
     """Формирование токена при корректных данных."""
     serializer = TokenSerializer(data=request.data)
@@ -110,8 +114,6 @@ def token(request):
             {'confirmation_code': 'Неверный код подтверждения.'}
         )
     refresh = RefreshToken.for_user(user)
-    user.confirmation_code = ''
-    user.save()
     data = {
         'access': str(refresh.access_token),
         'refresh': str(refresh)
@@ -122,7 +124,9 @@ def token(request):
 class TitleViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.select_related(
         'category'
-    ).prefetch_related('genre').all()
+    ).prefetch_related('genre').annotate(
+        rating=Avg('reviews__score')
+    )
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = TitleFilter
@@ -168,28 +172,19 @@ class GenreViewSet(
     serializer_class = GenreSerializer
 
 
-# def get_field(model, id):
-#     return get_object_or_404(model, id=id)
-
-
-class BaseRelatedViewSet(viewsets.ModelViewSet):
-
-    def get_field(self):
-        return get_object_or_404(self.model, id=self.kwargs[self.pk_field])
-
-
-class ReviewViewSet(BaseRelatedViewSet):
+class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
     permission_classes = (
         ReadOnlyPermission | IsAuthorOrAdminOrModerator | AdminPermission,
     )
-    model = Title
-    pk_field = 'title_id'
 
     def get_queryset(self):
         return self.get_field().reviews.all()
 
+    def get_field(self):
+        return get_object_or_404(Title, id=self.kwargs['title_id'])
+    
     def perform_create(self, serializer):
         serializer.save(
             author=self.request.user,
@@ -197,18 +192,19 @@ class ReviewViewSet(BaseRelatedViewSet):
         )
 
 
-class CommentViewSet(BaseRelatedViewSet):
+class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
     permission_classes = (
         ReadOnlyPermission | IsAuthorOrAdminOrModerator | AdminPermission,
     )
-    model = Review
-    pk_field = 'review_id'
 
     def get_queryset(self):
         """Получить все комментарии к отзыву."""
         return self.get_field().comments.all()
+
+    def get_field(self):
+        return get_object_or_404(Review, id=self.kwargs['review_id'])
 
     def perform_create(self, serializer):
         """Добавить новый комментарий к отзыву."""

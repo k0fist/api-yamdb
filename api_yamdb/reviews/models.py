@@ -11,8 +11,8 @@ MAX_SCORE = 10
 ADMIN = 'admin'
 MODERATOR = 'moderator'
 USER = 'user'
-SIZE_USERNAME = 150
-SIZE_EMAIL = 254
+USERNAME_LENGTH_MAX = 150
+EMAIL_LENGTH_MAX = 254
 
 
 class User(AbstractUser):
@@ -30,13 +30,13 @@ class User(AbstractUser):
     )
     username = models.CharField(
         verbose_name='Имя пользователя',
-        max_length=SIZE_USERNAME,
+        max_length=USERNAME_LENGTH_MAX,
         unique=True,
         validators=[validate_username]
     )
     email = models.EmailField(
         verbose_name='Электронная почта',
-        max_length=SIZE_EMAIL,
+        max_length=EMAIL_LENGTH_MAX,
         unique=True
     )
     bio = models.TextField(
@@ -63,10 +63,16 @@ class User(AbstractUser):
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['username', 'email'],
+                name='unique_username_email'
+            )
+        ]
 
 
 class BaseNamedModel(models.Model):
-    """Абстрактная модель для сущностей с названием и slug."""
+    """Абстрактная модель с названием и slug."""
     name = models.CharField(
         verbose_name='Название',
         max_length=256,
@@ -138,8 +144,8 @@ class Title(models.Model):
         ordering = ('name',)
 
 
-class BaseReviewComment(models.Model):
-    """Базовая модель для отзывов и комментариев."""
+class BaseTextModel(models.Model):
+    """Абстрактная модель с текстом, автором и датой."""
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -157,7 +163,7 @@ class BaseReviewComment(models.Model):
         ordering = ('-pub_date',)
 
 
-class Review(BaseReviewComment):
+class Review(BaseTextModel):
     """Модель отзывов."""
     title = models.ForeignKey(
         Title,
@@ -173,7 +179,7 @@ class Review(BaseReviewComment):
         verbose_name='Оценка'
     )
 
-    class Meta(BaseReviewComment.Meta):
+    class Meta(BaseTextModel.Meta):
         constraints = [
             models.UniqueConstraint(
                 fields=['title', 'author'],
@@ -184,7 +190,7 @@ class Review(BaseReviewComment):
         verbose_name_plural = 'Отзывы'
 
 
-class Comment(BaseReviewComment):
+class Comment(BaseTextModel):
     """Модель комментариев к отзывам."""
     review = models.ForeignKey(
         Review,
@@ -193,6 +199,6 @@ class Comment(BaseReviewComment):
         verbose_name='Отзыв'
     )
 
-    class Meta(BaseReviewComment.Meta):
+    class Meta(BaseTextModel.Meta):
         verbose_name = 'Комментарий'
         verbose_name_plural = 'Комментарии'
