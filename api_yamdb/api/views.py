@@ -3,6 +3,7 @@ import random
 from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
+from django.db.models import Avg
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, mixins, status, filters
@@ -25,7 +26,6 @@ from .permissions import (
     AdminPermission, IsAuthorOrAdminOrModerator, ReadOnlyPermission
 )
 from .filters import TitleFilter
-from reviews.validators import USER_ME
 
 
 User = get_user_model()
@@ -44,8 +44,8 @@ class UserView(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=['get', 'patch'],
-        url_path=USER_ME,
-        url_name=USER_ME,
+        url_path=settings.USER_ME,
+        url_name=settings.USER_ME,
         permission_classes=(IsAuthenticated,)
     )
     def myself(self, request, *args, **kwargs):
@@ -122,7 +122,9 @@ def token(request):
 class TitleViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.select_related(
         'category'
-    ).prefetch_related('genre').all()
+    ).prefetch_related('genre').annotate(
+        rating=Avg('reviews__score')
+    )
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = TitleFilter

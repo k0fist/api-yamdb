@@ -31,6 +31,7 @@ PIN_CODE_CHARACTERS = string.ascii_uppercase + string.digits
 PIN_CODE_LENGTH = 6
 FROM_EMAIL = 'sirotkin.201515@gmail.com'
 AUTH_USER_MODEL = 'reviews.User'
+USER_ME = 'me'
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
