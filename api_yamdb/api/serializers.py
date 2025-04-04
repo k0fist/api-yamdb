@@ -28,21 +28,22 @@ class UserValidationMixin:
     #     return email
 
 
-#class SignUpValidationMixin:
- #   def validate(self, data):
-  #      """Проверяем соответствие username и email."""
-   #     username = data.get("username")
-    #    email = data.get("email")
-     #   user = User.objects.filter(username=username).first()
-      #  if user:
-       #     if user.email != email:
-        #        raise ValidationError(
-         #           "Этот username уже зарегистрирован с другим email."
-          #      )
-           # return data
-        #if User.objects.filter(email=email).exists():
-         #   raise ValidationError("Этот email уже зарегистрирован.")
-        #return data
+class SignUpValidationMixin:
+    def validate(self, data):
+        """Проверяем соответствие username и email."""
+        username = data.get("username")
+        email = data.get("email")
+        user = User.objects.filter(username=username).first()
+        if user:
+            if user.email != email:
+                raise ValidationError(
+                    "Этот username уже зарегистрирован с другим email."
+                )
+            return data
+        if User.objects.filter(email=email).exists():
+            raise ValidationError("Этот email уже зарегистрирован.")
+        return data
+
 
 class UserSerializer(UserValidationMixin, serializers.ModelSerializer):
 
@@ -53,7 +54,7 @@ class UserSerializer(UserValidationMixin, serializers.ModelSerializer):
         )
 
 
-class SignUpSerializer(UserValidationMixin, serializers.Serializer):
+class SignUpSerializer(UserValidationMixin, SignUpValidationMixin, serializers.Serializer):
     username = serializers.CharField(
         max_length=USERNAME_LENGTH_MAX,
         required=True

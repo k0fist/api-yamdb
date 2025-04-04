@@ -27,7 +27,7 @@ from .permissions import (
 )
 from .filters import TitleFilter
 
-from reviews.validators import USER_ME
+# from reviews.validators import USER_ME
 from .trotllings import TokenRateThrottle
 
 
