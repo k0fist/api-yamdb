@@ -27,9 +27,7 @@ from .permissions import (
 )
 from .filters import TitleFilter
 
-# from reviews.validators import USER_ME
 from .trotllings import TokenRateThrottle
-
 
 
 User = get_user_model()
@@ -184,7 +182,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
     def get_field(self):
         return get_object_or_404(Title, id=self.kwargs['title_id'])
-    
+
     def perform_create(self, serializer):
         serializer.save(
             author=self.request.user,
