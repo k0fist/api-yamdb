@@ -20,14 +20,6 @@ class UserValidationMixin:
         return validate_username(username)
 
 
-    # def validate_email(self, email):
-    #     """Валидация email, разрешаем повторное использование."""
-    #     user = User.objects.filter(email=email).first()
-    #     if user:
-    #         return email
-    #     return email
-
-
 class SignUpValidationMixin:
     def validate(self, data):
         """Проверяем соответствие username и email."""
@@ -54,7 +46,11 @@ class UserSerializer(UserValidationMixin, serializers.ModelSerializer):
         )
 
 
-class SignUpSerializer(UserValidationMixin, SignUpValidationMixin, serializers.Serializer):
+class SignUpSerializer(
+    UserValidationMixin,
+    SignUpValidationMixin,
+    serializers.Serializer
+):
     username = serializers.CharField(
         max_length=USERNAME_LENGTH_MAX,
         required=True
