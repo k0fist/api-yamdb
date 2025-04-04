@@ -18,12 +18,12 @@ class UserValidationMixin:
         """Валидация username."""
         return validate_username(username)
 
-    def validate_email(self, email):
-        """Валидация email, разрешаем повторное использование."""
-        user = User.objects.filter(email=email).first()
-        if user:
-            return email
-        return email
+    # def validate_email(self, email):
+    #     """Валидация email, разрешаем повторное использование."""
+    #     user = User.objects.filter(email=email).first()
+    #     if user:
+    #         return email
+    #     return email
 
 
 class SignUpValidationMixin:
