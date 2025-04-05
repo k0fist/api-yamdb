@@ -27,8 +27,6 @@ from .permissions import (
 )
 from .filters import TitleFilter
 
-from .trotllings import TokenRateThrottle
-
 
 User = get_user_model()
 
@@ -77,10 +75,13 @@ def signup(request):
     elif User.objects.filter(email=email).exists():
         raise ValidationError("Этот email уже зарегистрирован.")
 
-    user, created = User.objects.get_or_create(
-        username=username,
-        defaults={'email': email}
-    )
+    try:
+        user, created = User.objects.get_or_create(
+            username=username,
+            defaults={'email': email}
+        )
+    except Exception as e:
+        raise ValidationError(f"Ошибка при создании пользователя: {str(e)}")
 
     confirmation_code = ''.join(
         random.choices(
@@ -107,7 +108,6 @@ def signup(request):
 
 
 @api_view(['POST'])
-@throttle_classes([TokenRateThrottle])
 def token(request):
     """Формирование токена при корректных данных."""
     serializer = TokenSerializer(data=request.data)
@@ -117,6 +117,8 @@ def token(request):
     user = get_object_or_404(User, username=username)
     confirmation_code = serializer.validated_data.get('confirmation_code')
     if user.confirmation_code != confirmation_code:
+        user.confirmation_code = ''
+        user.save()
         raise ValidationError(
             {'confirmation_code': 'Неверный код подтверждения.'}
         )
@@ -125,6 +127,9 @@ def token(request):
         'access': str(refresh.access_token),
         'refresh': str(refresh)
     }
+    user.confirmation_code = ''
+    user.save()
+
     return Response(data, status=status.HTTP_200_OK)
 
 
@@ -133,7 +138,7 @@ class TitleViewSet(viewsets.ModelViewSet):
         'category'
     ).prefetch_related('genre').annotate(
         rating=Avg('reviews__score')
-    )
+    ).order_by(*Title._meta.ordering)
     pagination_class = LimitOffsetPagination
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = TitleFilter
@@ -187,15 +192,15 @@ class ReviewViewSet(viewsets.ModelViewSet):
     )
 
     def get_queryset(self):
-        return self.get_field().reviews.all()
+        return self.get_review().reviews.all()
 
-    def get_field(self):
+    def get_review(self):
         return get_object_or_404(Title, id=self.kwargs['title_id'])
 
     def perform_create(self, serializer):
         serializer.save(
             author=self.request.user,
-            title=self.get_field()
+            title=self.get_review()
         )
 
 
@@ -208,14 +213,14 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Получить все комментарии к отзыву."""
-        return self.get_field().comments.all()
+        return self.get_comment().comments.all()
 
-    def get_field(self):
+    def get_comment(self):
         return get_object_or_404(Review, id=self.kwargs['review_id'])
 
     def perform_create(self, serializer):
         """Добавить новый комментарий к отзыву."""
         serializer.save(
             author=self.request.user,
-            review=self.get_field()
+            review=self.get_comment()
         )
