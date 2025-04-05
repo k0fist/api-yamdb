@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
-from rest_framework.decorators import action, api_view, throttle_classes
+from rest_framework.decorators import action, api_view
 
 from reviews.models import Review, Title, Category, Genre
 from .serializers import (
