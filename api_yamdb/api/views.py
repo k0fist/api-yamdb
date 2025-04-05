@@ -68,6 +68,15 @@ def signup(request):
     serializer.is_valid(raise_exception=True)
     email = serializer.validated_data['email']
     username = serializer.validated_data['username']
+    user = User.objects.filter(username=username).first()
+    if user:
+        if user.email != email:
+            raise ValidationError(
+                "Этот username уже зарегистрирован с другим email."
+            )
+    elif User.objects.filter(email=email).exists():
+        raise ValidationError("Этот email уже зарегистрирован.")
+
     user, created = User.objects.get_or_create(
         username=username,
         defaults={'email': email}
