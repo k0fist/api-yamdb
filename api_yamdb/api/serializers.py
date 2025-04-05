@@ -20,23 +20,6 @@ class UserValidationMixin:
         return validate_username(username)
 
 
-class SignUpValidationMixin:
-    def validate(self, data):
-        """Проверяем соответствие username и email."""
-        username = data.get("username")
-        email = data.get("email")
-        user = User.objects.filter(username=username).first()
-        if user:
-            if user.email != email:
-                raise ValidationError(
-                    "Этот username уже зарегистрирован с другим email."
-                )
-            return data
-        if User.objects.filter(email=email).exists():
-            raise ValidationError("Этот email уже зарегистрирован.")
-        return data
-
-
 class UserSerializer(UserValidationMixin, serializers.ModelSerializer):
 
     class Meta:
@@ -46,11 +29,7 @@ class UserSerializer(UserValidationMixin, serializers.ModelSerializer):
         )
 
 
-class SignUpSerializer(
-    UserValidationMixin,
-    SignUpValidationMixin,
-    serializers.Serializer
-):
+class SignUpSerializer(UserValidationMixin, serializers.Serializer):
     username = serializers.CharField(
         max_length=USERNAME_LENGTH_MAX,
         required=True
@@ -60,9 +39,13 @@ class SignUpSerializer(
 
 class TokenSerializer(UserValidationMixin, serializers.Serializer):
     """Сериализатор для запроса токена."""
-    username = serializers.CharField(max_length=USERNAME_LENGTH_MAX)
+    username = serializers.CharField(
+        max_length=USERNAME_LENGTH_MAX,
+        required=True
+    )
     confirmation_code = serializers.CharField(
-        max_length=settings.PIN_CODE_LENGTH
+        max_length=settings.PIN_CODE_LENGTH,
+        required=True
     )
 
 
@@ -81,7 +64,7 @@ class GenreSerializer(serializers.ModelSerializer):
 
 
 class TitleReadSerializer(serializers.ModelSerializer):
-    rating = serializers.FloatField(read_only=True)
+    rating = serializers.IntegerField(read_only=True)
     category = CategorySerializer()
     genre = GenreSerializer(many=True)
 
