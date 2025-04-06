@@ -1,8 +1,8 @@
-import random
-
 from django.conf import settings
+from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action, api_view
 
@@ -66,30 +66,27 @@ def signup(request):
     serializer.is_valid(raise_exception=True)
     email = serializer.validated_data['email']
     username = serializer.validated_data['username']
-    user = User.objects.filter(username=username).first()
-    if user:
-        if user.email != email:
-            raise ValidationError(
-                "Этот username уже зарегистрирован с другим email."
-            )
-    elif User.objects.filter(email=email).exists():
-        raise ValidationError("Этот email уже зарегистрирован.")
 
     try:
         user, created = User.objects.get_or_create(
             username=username,
             defaults={'email': email}
         )
+    except IntegrityError:
+        if User.objects.filter(username=username).exists():
+            raise ValidationError(
+                'Пользователь с таким username уже существует'
+            )
+        if User.objects.filter(email=email).exists():
+            raise ValidationError(
+                'Пользователь с такой email уже существует'
+            )
     except Exception as e:
-        raise ValidationError(f"Ошибка при создании пользователя: {str(e)}")
+        raise ValidationError(
+            f'Ошибка при создании пользователя: {str(e)}'
+        )
 
-    confirmation_code = ''.join(
-        random.choices(
-            settings.PIN_CODE_CHARACTERS,
-            k=settings.PIN_CODE_LENGTH
-        ))
-    user.confirmation_code = confirmation_code
-    user.save()
+    confirmation_code = default_token_generator.make_token(user)
 
     send_mail(
         'Код подтверждения',
@@ -116,21 +113,14 @@ def token(request):
     username = serializer.validated_data.get('username')
     user = get_object_or_404(User, username=username)
     confirmation_code = serializer.validated_data.get('confirmation_code')
-    if user.confirmation_code != confirmation_code:
-        user.confirmation_code = ''
-        user.save()
+    if not default_token_generator.check_token(user, confirmation_code):
         raise ValidationError(
-            {'confirmation_code': 'Неверный код подтверждения.'}
+            {'confirmation_code': 'Код подтверждения невалиден'}
         )
-    refresh = RefreshToken.for_user(user)
-    data = {
-        'access': str(refresh.access_token),
-        'refresh': str(refresh)
-    }
-    user.confirmation_code = ''
-    user.save()
 
-    return Response(data, status=status.HTTP_200_OK)
+    return Response({
+        'token': AccessToken.for_user(user)
+    }, status=status.HTTP_200_OK)
 
 
 class TitleViewSet(viewsets.ModelViewSet):
@@ -213,14 +203,14 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Получить все комментарии к отзыву."""
-        return self.get_comment().comments.all()
+        return self.get_review().comments.all()
 
-    def get_comment(self):
+    def get_review(self):
         return get_object_or_404(Review, id=self.kwargs['review_id'])
 
     def perform_create(self, serializer):
         """Добавить новый комментарий к отзыву."""
         serializer.save(
             author=self.request.user,
-            review=self.get_comment()
+            review=self.get_review()
         )
