@@ -67,7 +67,7 @@ def signup(request):
     email = serializer.validated_data['email']
     username = serializer.validated_data['username']
 
-    if User.objects.filter(username=username).exists(): 
+    if User.objects.filter(username=username).exists():
         if not User.objects.filter(email=email).exists():
             raise ValidationError('Username уже занят.')
     if User.objects.filter(email=email).exists():
