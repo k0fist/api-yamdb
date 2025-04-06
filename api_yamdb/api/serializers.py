@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.conf import settings
 
@@ -36,28 +35,12 @@ class SignUpSerializer(UserValidationMixin, serializers.Serializer):
     )
     email = serializers.EmailField(max_length=EMAIL_LENGTH_MAX, required=True)
 
-    def validate(self, data):
-        """Проверяем соответствие username и email."""
-        username = data.get("username")
-        email = data.get("email")
-        user = User.objects.filter(username=username).first()
-        if user:
-            if user.email != email:
-                raise ValidationError(
-                    "Этот username уже зарегистрирован с другим email."
-                )
-            return data
-        if User.objects.filter(email=email).exists():
-            raise ValidationError("Этот email уже зарегистрирован.")
-        return data
-
 
 class TokenSerializer(UserValidationMixin, serializers.Serializer):
     """Сериализатор для запроса токена."""
     username = serializers.CharField(
         max_length=USERNAME_LENGTH_MAX,
         required=True,
-        validators=(validate_username,)
     )
     confirmation_code = serializers.CharField(
         max_length=settings.PIN_CODE_LENGTH,

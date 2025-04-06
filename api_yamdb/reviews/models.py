@@ -1,5 +1,4 @@
 from django.db import models
-from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 
@@ -23,11 +22,6 @@ class User(AbstractUser):
         (MODERATOR, 'Moderator'),
         (USER, 'User'),
     ]
-    confirmation_code = models.CharField(
-        verbose_name='Код подтверждения',
-        max_length=settings.PIN_CODE_LENGTH,
-        default=''
-    )
     username = models.CharField(
         verbose_name='Имя пользователя',
         max_length=USERNAME_LENGTH_MAX,

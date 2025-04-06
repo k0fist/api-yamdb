@@ -67,21 +67,19 @@ def signup(request):
     email = serializer.validated_data['email']
     username = serializer.validated_data['username']
 
+    if User.objects.filter(username=username).exists(): 
+        if not User.objects.filter(email=email).exists():
+            raise ValidationError('Username уже занят.')
+    if User.objects.filter(email=email).exists():
+        if not User.objects.filter(username=username).exists():
+            raise ValidationError('Email уже занят.')
+
     try:
         user, created = User.objects.get_or_create(
             username=username,
             defaults={'email': email}
         )
-    except IntegrityError:
-        if User.objects.filter(username=username).exists():
-            raise ValidationError(
-                'Пользователь с таким username уже существует'
-            )
-        if User.objects.filter(email=email).exists():
-            raise ValidationError(
-                'Пользователь с такой email уже существует'
-            )
-    except Exception as e:
+    except IntegrityError as e:
         raise ValidationError(
             f'Ошибка при создании пользователя: {str(e)}'
         )
