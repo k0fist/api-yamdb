@@ -14,7 +14,6 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action, api_view
-from django.db.models import Q
 
 from reviews.models import Review, Title, Category, Genre
 from .serializers import (
