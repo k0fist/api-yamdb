@@ -14,6 +14,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import action, api_view
+from django.db.models import Q
 
 from reviews.models import Review, Title, Category, Genre
 from .serializers import (
@@ -67,21 +68,16 @@ def signup(request):
     email = serializer.validated_data['email']
     username = serializer.validated_data['username']
 
-    if User.objects.filter(username=username).exists():
-        if not User.objects.filter(email=email).exists():
-            raise ValidationError('Username уже занят.')
-    if User.objects.filter(email=email).exists():
-        if not User.objects.filter(username=username).exists():
-            raise ValidationError('Email уже занят.')
-
     try:
         user, created = User.objects.get_or_create(
             username=username,
-            defaults={'email': email}
+            email=email
         )
-    except IntegrityError as e:
+    except IntegrityError:
         raise ValidationError(
-            f'Ошибка при создании пользователя: {str(e)}'
+            "Этот username уже зарегистрирован с другим email."
+            if User.objects.filter(username=username).exists()
+            else "Этот email уже зарегистрирован с другим username."
         )
 
     confirmation_code = default_token_generator.make_token(user)
